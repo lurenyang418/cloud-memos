@@ -1,0 +1,60 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "categories": {
+    "correctness": "error"
+  },
+  "plugins": [
+    "eslint",
+    "typescript",
+    "unicorn",
+    "oxc",
+    "react",
+    "vitest",
+    "promise",
+    "import"
+  ],
+  "ignorePatterns": [
+    "dist/**",
+    "node_modules/**",
+    "worker-configuration.d.ts",
+    "migrations/meta/**"
+  ],
+  "options": {
+    "typeAware": true,
+    "reportUnusedDisableDirectives": "error"
+  },
+  "rules": {
+    "typescript/no-floating-promises": "error",
+    "typescript/no-explicit-any": "error",
+    "typescript/consistent-type-imports": "error",
+    "react/rules-of-hooks": "error",
+    "react/exhaustive-deps": "error",
+    "react/react-in-jsx-scope": "off",
+    "react/only-export-components": [
+      "warn",
+      {
+        "allowConstantExport": true
+      }
+    ]
+  },
+  "overrides": [
+    {
+      "files": ["src/web/**/*.{ts,tsx}"],
+      "env": {
+        "browser": true
+      }
+    },
+    {
+      "files": ["src/worker/**/*.ts"],
+      "env": {
+        "worker": true
+      }
+    },
+    {
+      "files": ["src/**/*.test.{ts,tsx}"],
+      "env": {
+        "vitest": true
+      }
+    }
+  ]
+}

@@ -1,0 +1,58 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "cloud-memos",
+  "main": "./src/worker/index.ts",
+  "compatibility_date": "2026-06-27",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"]
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "cloud-memos",
+      "migrations_dir": "./migrations"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "ATTACHMENTS",
+      "bucket_name": "cloud-memos-attachments"
+    }
+  ],
+  "triggers": {
+    "crons": ["17 3 * * *"]
+  },
+  "vars": {
+    "APP_NAME": "Cloud Memos",
+    "ATTACHMENT_MAX_BYTES": "26214400"
+  },
+  "observability": {
+    "enabled": true,
+    "logs": { "head_sampling_rate": 1 },
+    "traces": { "enabled": true, "head_sampling_rate": 0.01 }
+  },
+  "env": {
+    "staging": {
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "cloud-memos-staging",
+          "database_id": "3ea46891-600b-4615-892e-2ae5c8dac3f8",
+          "migrations_dir": "./migrations"
+        }
+      ],
+      "r2_buckets": [
+        {
+          "binding": "ATTACHMENTS",
+          "bucket_name": "cloud-memos-attachments-staging"
+        }
+      ],
+      "vars": {
+        "APP_NAME": "Cloud Memos Staging",
+        "ATTACHMENT_MAX_BYTES": "26214400"
+      }
+    }
+  }
+}
