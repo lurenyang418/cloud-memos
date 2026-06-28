@@ -125,7 +125,7 @@ test("initializes, captures a memo, filters by tag, and opens its public page", 
   await expect(page.getByText(attachmentMemo, { exact: true })).toBeVisible();
 
   await page.getByRole("button", { name: tagName }).click();
-  await expect(page.getByRole("button", { name: tagName })).toBeVisible();
+  await expect(page.locator(".filter-chip")).toHaveText(tagName);
   await page.getByRole("link", { name: "公开主页" }).click();
   await expect(page.getByRole("heading", { name: "E2E Admin" })).toBeVisible();
   await expect(page.getByText(content, { exact: false })).toBeVisible();
