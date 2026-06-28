@@ -90,6 +90,8 @@ NODE_USE_ENV_PROXY=1 pnpm smoke:staging https://cloud-memos-staging.lurenyang-00
 
 正式使用 staging 前，应清除临时用户，并通过交互式 `secret put --env staging` 设置自己保存的初始化令牌。
 
+首次 production 初始化完成后，后续版本通过 `vMAJOR.MINOR.PATCH` tag 触发 GitHub Actions 发布。发布任务会在 `production` Environment 保护下运行检查、migration、部署和 smoke test；具体配置与回滚方式见 [部署指南](./docs/DEPLOYMENT.md)。
+
 ## 数据与权限
 
 - `PRIVATE`：只有作者可读。

@@ -7,6 +7,7 @@
 - [ ] `pnpm test:e2e` 通过。
 - [ ] `pnpm audit --prod` 无未接受的高危漏洞。
 - [ ] 构建产物不包含 `.dev.vars`、`.env` 或测试 secret。
+- [ ] 发布 tag 匹配 `vMAJOR.MINOR.PATCH`，且对应提交属于 `main`。
 
 ## Cloudflare 资源
 
@@ -14,6 +15,7 @@
 - [ ] production D1/R2 名称和 ID 与 `wrangler.jsonc` 一致。
 - [ ] R2 bucket 无公开访问策略。
 - [ ] production secrets 已交互式设置且保存在密码管理器。
+- [ ] GitHub `production` Environment 的 Cloudflare Token 与 account ID 有效。
 - [ ] migration 已先在 staging 验证。
 
 ## 数据保护

@@ -31,6 +31,26 @@ pnpm deploy:production
 
 访问 production `/setup` 创建首位管理员。成功后确认 `/api/v1/session` 返回 `setupRequired: false`，并删除或轮换 bootstrap secret。
 
+## Tag 自动发布
+
+GitHub `production` Environment 保存以下 CI 凭证：
+
+- Secret `CLOUDFLARE_API_TOKEN`：限定当前 Cloudflare account，至少包含 Workers Scripts Edit 和 D1 Edit。
+- Variable `CLOUDFLARE_ACCOUNT_ID`：目标 Cloudflare account ID。
+
+生产 Worker 的 `BETTER_AUTH_SECRET` 只保存在 Cloudflare，不复制到 GitHub。发布前先将 staging 验收通过的提交合并到 `main`，再创建标准 SemVer tag：
+
+```bash
+git switch main
+git pull --ff-only
+git tag -a v0.1.0 -m "Release v0.1.0"
+git push origin v0.1.0
+```
+
+`.github/workflows/release.yml` 会确认 tag 匹配 `vMAJOR.MINOR.PATCH` 且提交属于 `main`，随后执行完整检查、E2E、依赖审计、production migration、Worker 部署和线上 smoke test。production Environment 应只允许 `v*` tag；需要人工发布门禁时，在该 Environment 配置 required reviewer。
+
+自动 migration 要求数据库变更保持向后兼容，使上一 Worker version 在代码回滚后仍能运行。不要为修复失败发布而复用或移动已有 tag，应修复后发布新的 patch tag。
+
 ## 常规发布
 
 1. 记录当前 Worker version 和 D1 Time Travel bookmark。
