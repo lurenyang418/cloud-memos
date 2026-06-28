@@ -24,7 +24,7 @@ export function LoginPage({ appName }: { appName: string }) {
     <AuthCard appName={appName} eyebrow="欢迎回来" title="继续记录" subtitle="你的想法仍在原处等你。" footer={<span>账号由实例管理员邀请创建</span>}>
       <form className="form-stack" onSubmit={submit}>
         <Field label="邮箱"><Input type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} /></Field>
-        <Field label="密码"><Input type="password" autoComplete="current-password" required minLength={12} value={password} onChange={(e) => setPassword(e.target.value)} /></Field>
+        <Field label="密码"><Input type="password" autoComplete="current-password" required minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} /></Field>
         <FormError error={mutation.error?.message} />
         <SubmitButton pending={mutation.isPending}>登录</SubmitButton>
       </form>

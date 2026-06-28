@@ -1,11 +1,12 @@
 import * as Dialog from "@radix-ui/react-dialog";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Archive, ArchiveRestore, Copy, Download, Pencil, Pin, PinOff, Trash2, X } from "lucide-react";
-import { useState, type FormEvent } from "react";
+import { Archive, ArchiveRestore, Copy, Download, FileDown, Pencil, Pin, PinOff, Trash2, X } from "lucide-react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import type { Memo, MemoVisibility } from "../../shared/types";
 import { ApiError, api, formatBytes, getMemo } from "../api";
 import { FormError, Textarea } from "./Form";
+import { downloadMemoMarkdown } from "../export";
 import { Markdown } from "./Markdown";
 import { VisibilityBadge, VisibilitySelect } from "./VisibilitySelect";
 
@@ -20,6 +21,12 @@ export function MemoCard({ memo, editable = false, onTag }: { memo: Memo; editab
   const [conflictMessage, setConflictMessage] = useState("");
   const [copied, setCopied] = useState(false);
   const queryClient = useQueryClient();
+  useEffect(() => {
+    if (!editing && memo.version >= version) {
+      setContent(memo.content);
+      setVersion(memo.version);
+    }
+  }, [editing, memo.content, memo.version, version]);
   const invalidate = async () => {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ["memos"] }),
@@ -82,7 +89,7 @@ export function MemoCard({ memo, editable = false, onTag }: { memo: Memo; editab
           <FormError error={update.error instanceof ApiError && update.error.code === "VERSION_CONFLICT" ? null : update.error?.message} />
           <div className="flex items-center justify-between"><VisibilitySelect value={visibility} onChange={setVisibility} /><div className="flex gap-2"><button className="button button-ghost" type="button" onClick={() => setEditing(false)}>取消</button><button className="button button-primary" disabled={update.isPending}>保存</button></div></div>
         </form>
-      ) : <Markdown>{memo.content}</Markdown>}
+      ) : <Markdown>{content}</Markdown>}
       {memo.attachments.length > 0 && <div className="attachments-grid">{memo.attachments.map((attachment) => attachment.contentType.startsWith("image/") && attachment.contentType !== "image/svg+xml" ? (
         <a key={attachment.id} href={attachment.url} target="_blank" rel="noreferrer" className="image-attachment"><img src={attachment.url} alt={attachment.filename} loading="lazy" /><span>{attachment.filename}</span></a>
       ) : (
@@ -91,6 +98,7 @@ export function MemoCard({ memo, editable = false, onTag }: { memo: Memo; editab
       {memo.tags.length > 0 && <div className="tag-list">{memo.tags.map((tag) => <button key={tag} type="button" onClick={() => onTag?.(tag)}>#{tag}</button>)}</div>}
       <footer className="memo-actions">
         <button className="action-button" type="button" onClick={() => { void copyLink(); }}><Copy size={15} />{copied ? "已复制" : "分享"}</button>
+        <button className="action-button" type="button" onClick={() => downloadMemoMarkdown({ ...memo, content })}><FileDown size={15} />导出 Markdown</button>
         {editable && <>
           <button className="action-button" type="button" onClick={startEditing}><Pencil size={15} />编辑</button>
           <button className="action-button" type="button" disabled={update.isPending} onClick={() => update.mutate({ pinned: !memo.pinned })}>{memo.pinned ? <PinOff size={15} /> : <Pin size={15} />}{memo.pinned ? "取消置顶" : "置顶"}</button>

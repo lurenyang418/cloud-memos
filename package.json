@@ -36,6 +36,7 @@
     "@radix-ui/react-select": "latest",
     "@tanstack/react-query": "latest",
     "better-auth": "latest",
+    "client-zip": "2.5.0",
     "drizzle-orm": "latest",
     "hono": "latest",
     "lucide-react": "latest",

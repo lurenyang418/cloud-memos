@@ -35,8 +35,8 @@ export function createAuth(env: AppBindings, requestUrl: string, executionContex
     }),
     emailAndPassword: {
       enabled: true,
-      minPasswordLength: 12,
-      maxPasswordLength: 128,
+      minPasswordLength: 8,
+      maxPasswordLength: 12,
       autoSignIn: true,
       password: { hash: hashPassword, verify: verifyPassword },
     },

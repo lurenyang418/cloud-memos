@@ -17,7 +17,7 @@ export function RecoveryPage({ appName }: { appName: string }) {
     <AuthCard appName={appName} eyebrow="账号恢复" title="设置新密码" subtitle={info.data ? `正在恢复 ${info.data.email}` : "正在验证恢复链接…"} footer={mutation.isSuccess ? <Link to="/login">返回登录</Link> : undefined}>
       {info.isPending ? <div className="grid place-items-center py-12"><LoaderCircle className="animate-spin text-stone-400" /></div> : info.isError ? <FormError error={info.error.message} /> : mutation.isSuccess ? <div className="success-panel">密码已更新，其他会话均已退出。</div> : (
         <form className="form-stack" onSubmit={submit}>
-          <Field label="新密码" hint="至少 12 个字符"><Input type="password" autoComplete="new-password" required minLength={12} maxLength={128} value={password} onChange={(e) => setPassword(e.target.value)} /></Field>
+          <Field label="新密码" hint="8–12 个字符"><Input type="password" autoComplete="new-password" required minLength={8} maxLength={12} value={password} onChange={(e) => setPassword(e.target.value)} /></Field>
           <FormError error={mutation.error?.message} /><SubmitButton pending={mutation.isPending}>更新密码</SubmitButton>
         </form>
       )}

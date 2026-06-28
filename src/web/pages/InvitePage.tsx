@@ -5,6 +5,7 @@ import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { api } from "../api";
 import { AuthCard } from "../components/AuthCard";
 import { Field, FormError, Input, SubmitButton } from "../components/Form";
+import { UsernameField } from "../components/UsernameField";
 
 export function InvitePage({ appName }: { appName: string }) {
   const { token = "" } = useParams();
@@ -28,8 +29,8 @@ export function InvitePage({ appName }: { appName: string }) {
     <AuthCard appName={appName} eyebrow="受邀加入" title="创建你的账号" subtitle={invitation.data ? `邀请邮箱：${invitation.data.email}` : "正在验证邀请…"}>
       {invitation.isPending ? <div className="grid place-items-center py-12"><LoaderCircle className="animate-spin text-stone-400" /></div> : invitation.isError ? <FormError error={invitation.error.message} /> : (
         <form className="form-stack" onSubmit={submit}>
-          <div className="form-grid"><Field label="显示名称"><Input required maxLength={80} value={form.name} onChange={set("name")} /></Field><Field label="用户名"><Input required minLength={3} maxLength={32} pattern="[a-z0-9][a-z0-9_-]*[a-z0-9]" value={form.username} onChange={set("username")} /></Field></div>
-          <Field label="密码" hint="至少 12 个字符"><Input type="password" autoComplete="new-password" required minLength={12} maxLength={128} value={form.password} onChange={set("password")} /></Field>
+          <div className="form-grid"><Field label="显示名称"><Input required maxLength={80} value={form.name} onChange={set("name")} /></Field><UsernameField value={form.username} onChange={(username) => setForm((value) => ({ ...value, username }))} /></div>
+          <Field label="密码" hint="8–12 个字符"><Input type="password" autoComplete="new-password" required minLength={8} maxLength={12} value={form.password} onChange={set("password")} /></Field>
           <FormError error={mutation.error?.message} /><SubmitButton pending={mutation.isPending}>接受邀请</SubmitButton>
         </form>
       )}

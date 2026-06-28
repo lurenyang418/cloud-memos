@@ -30,8 +30,13 @@ export function getSession() {
   return api<SessionResponse>("/api/v1/session");
 }
 
+export function signOutSession() {
+  return api<{ success: boolean }>("/api/auth/sign-out", { method: "POST", body: "{}" });
+}
+
 export interface MemoFilters {
   state?: "ACTIVE" | "ARCHIVED";
+  limit?: number;
   visibility?: string;
   q?: string;
   tag?: string;
@@ -41,6 +46,7 @@ export interface MemoFilters {
 export function listMemos(filters: MemoFilters = {}) {
   const params = new URLSearchParams();
   if (filters.state) params.set("state", filters.state);
+  if (filters.limit) params.set("limit", String(filters.limit));
   if (filters.visibility) params.set("visibility", filters.visibility);
   if (filters.q) params.set("q", filters.q);
   if (filters.tag) params.set("tag", filters.tag);

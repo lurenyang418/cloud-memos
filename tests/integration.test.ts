@@ -30,7 +30,7 @@ describe.sequential("worker integration", () => {
         name: "Admin",
         username: "admin",
         email: "admin@example.com",
-        password: "a-secure-test-password",
+        password: "admin1234",
       }),
     });
     expect(response.status).toBe(200);
@@ -41,7 +41,7 @@ describe.sequential("worker integration", () => {
   it("closes bootstrap and exposes the authenticated session", async () => {
     const repeated = await request("/api/v1/setup", {
       method: "POST",
-      body: JSON.stringify({ token: "test-bootstrap-token-with-enough-entropy", name: "Other", username: "other", email: "other@example.com", password: "another-secure-password" }),
+      body: JSON.stringify({ token: "test-bootstrap-token-with-enough-entropy", name: "Other", username: "other", email: "other@example.com", password: "otherpass8" }),
     });
     expect(repeated.status).toBe(409);
     const session = await request("/api/v1/session", undefined, adminCookie);
@@ -52,16 +52,48 @@ describe.sequential("worker integration", () => {
   it("requires invitations and consumes an invitation exactly once", async () => {
     const direct = await request("/api/auth/sign-up/email", {
       method: "POST",
-      body: JSON.stringify({ name: "Blocked", username: "blocked", email: "blocked@example.com", password: "blocked-user-password" }),
+      body: JSON.stringify({ name: "Blocked", username: "blocked", email: "blocked@example.com", password: "blocked88" }),
     });
     expect(direct.status).toBe(403);
 
     const inviteResponse = await request("/api/v1/admin/invitations", { method: "POST", body: JSON.stringify({ email: "member@example.com" }) }, adminCookie);
     expect(inviteResponse.status).toBe(201);
     const invitation = await json<{ token: string }>(inviteResponse);
+    const invalidUsername = await request("/api/v1/invitations/accept", {
+      method: "POST",
+      body: JSON.stringify({ token: invitation.token, name: "Member", username: "Member", password: "memberpass8" }),
+    });
+    expect(invalidUsername.status).toBe(400);
+    expect(await json<{ error: { message: string } }>(invalidUsername)).toMatchObject({
+      error: { message: "用户名只能使用小写字母、数字和 _" },
+    });
+    const shortPassword = await request("/api/v1/invitations/accept", {
+      method: "POST",
+      body: JSON.stringify({ token: invitation.token, name: "Member", username: "member", password: "1234567" }),
+    });
+    expect(shortPassword.status).toBe(400);
+    expect(await json<{ error: { message: string } }>(shortPassword)).toMatchObject({
+      error: { message: "密码至少需要 8 个字符" },
+    });
+    const longUsername = await request("/api/v1/invitations/accept", {
+      method: "POST",
+      body: JSON.stringify({ token: invitation.token, name: "Member", username: "abcdefghijk", password: "pass1234" }),
+    });
+    expect(longUsername.status).toBe(400);
+    expect(await json<{ error: { message: string } }>(longUsername)).toMatchObject({
+      error: { message: "用户名不能超过 10 个字符" },
+    });
+    const longPassword = await request("/api/v1/invitations/accept", {
+      method: "POST",
+      body: JSON.stringify({ token: invitation.token, name: "Member", username: "member", password: "1234567890123" }),
+    });
+    expect(longPassword.status).toBe(400);
+    expect(await json<{ error: { message: string } }>(longPassword)).toMatchObject({
+      error: { message: "密码不能超过 12 个字符" },
+    });
     const accept = await request("/api/v1/invitations/accept", {
       method: "POST",
-      body: JSON.stringify({ token: invitation.token, name: "Member", username: "member", password: "member-secure-password" }),
+      body: JSON.stringify({ token: invitation.token, name: "Member", username: "___", password: "pass1234" }),
     });
     expect(accept.status).toBe(200);
     memberCookie = accept.headers.get("set-cookie")?.split(";")[0] ?? "";
@@ -70,9 +102,23 @@ describe.sequential("worker integration", () => {
     expect(memberId).not.toBe("");
     const reused = await request("/api/v1/invitations/accept", {
       method: "POST",
-      body: JSON.stringify({ token: invitation.token, name: "Again", username: "again", password: "another-secure-password" }),
+      body: JSON.stringify({ token: invitation.token, name: "Again", username: "again", password: "againpass8" }),
     });
     expect(reused.status).toBe(404);
+
+    const duplicateInviteResponse = await request("/api/v1/admin/invitations", {
+      method: "POST",
+      body: JSON.stringify({ email: "duplicate-name@example.com" }),
+    }, adminCookie);
+    const duplicateInvitation = await json<{ token: string }>(duplicateInviteResponse);
+    const duplicateUsername = await request("/api/v1/invitations/accept", {
+      method: "POST",
+      body: JSON.stringify({ token: duplicateInvitation.token, name: "Duplicate", username: "___", password: "pass5678" }),
+    });
+    expect(duplicateUsername.status).toBe(409);
+    expect(await json<{ error: { code: string; message: string } }>(duplicateUsername)).toMatchObject({
+      error: { code: "USERNAME_EXISTS", message: "该用户名已被使用，请换一个" },
+    });
   });
 
   it("lets only admins configure a safe public contact link", async () => {
@@ -251,14 +297,21 @@ describe.sequential("worker integration", () => {
     const recovery = await json<{ token: string }>(recoveryResponse);
     const reset = await request("/api/v1/recovery/reset", {
       method: "POST",
-      body: JSON.stringify({ token: recovery.token, password: "member-recovered-password" }),
+      body: JSON.stringify({ token: recovery.token, password: "newpass8" }),
     });
     expect(reset.status).toBe(200);
     expect((await request("/api/v1/memos", undefined, memberCookie)).status).toBe(401);
     const login = await request("/api/auth/sign-in/email", {
       method: "POST",
-      body: JSON.stringify({ email: "member@example.com", password: "member-recovered-password" }),
+      body: JSON.stringify({ email: "member@example.com", password: "newpass8" }),
     });
     expect(login.status).toBe(200);
+  });
+
+  it("signs out when Better Auth receives an empty JSON body", async () => {
+    const signOut = await request("/api/auth/sign-out", { method: "POST", headers: { origin }, body: "{}" }, adminCookie);
+    expect(signOut.status).toBe(200);
+    const session = await request("/api/v1/session", undefined, adminCookie);
+    expect(await json<{ viewer: unknown }>(session)).toMatchObject({ viewer: null });
   });
 });

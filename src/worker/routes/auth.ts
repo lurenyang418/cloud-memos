@@ -72,6 +72,8 @@ authRoutes.post("/invitations/accept", validateJson(inviteAcceptSchema), async (
     ))
     .limit(1);
   if (!invitation[0]) throw new HttpError(404, "INVALID_INVITATION", "邀请无效或已过期");
+  const existingUsername = await db.select({ id: users.id }).from(users).where(eq(users.username, body.username)).limit(1);
+  if (existingUsername[0]) throw new HttpError(409, "USERNAME_EXISTS", "该用户名已被使用，请换一个");
 
   const headers = new Headers(c.req.raw.headers);
   headers.set("x-invite-token", body.token);

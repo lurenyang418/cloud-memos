@@ -12,6 +12,8 @@
 - 匿名公开首页、邀请制登录入口和可配置的“联系站长”链接
 - `PRIVATE`、`MEMBERS`、`PUBLIC` 三档可见性
 - R2 私有附件和按 Memo 权限动态鉴权
+- 可折叠的桌面侧边栏，折叠状态保存在当前浏览器
+- 单篇原始 Markdown 下载，以及包含全部个人 Memo、元数据和附件的 ZIP 导出
 - 公开用户主页与稳定的 Memo 分享地址
 - 管理员邀请制注册、账号停用和一次性恢复链接
 - 浏览器本地草稿、响应式界面
@@ -101,6 +103,12 @@ NODE_USE_ENV_PROXY=1 pnpm smoke:staging https://cloud-memos-staging.lurenyang-00
 - 附件 bucket 必须保持私有；所有下载都经过 `/api/v1/attachments/:id/content` 重新检查权限。
 - HTML、SVG 等主动内容强制下载；只有受控图片 MIME 类型允许内联展示。
 - 更新 Memo 必须提交当前 `version`，过期写入返回 `409 VERSION_CONFLICT`。
+
+## 内容导出
+
+Memo 正文在 D1 中以原始 Markdown 保存。每张 Memo 卡片都可以直接下载对应的 `.md` 源文件，不会注入 front matter 或改写正文。
+
+登录用户可在“设置 → 内容导出”生成个人完整 ZIP。归档包含活跃与已归档 Memo、R2 附件及 `manifest.json` 元数据；ZIP 在浏览器中生成，附件仍通过现有鉴权接口读取。该功能适合个人迁移，不替代运维层面的 D1 与 R2 备份。
 
 ## 主要 API
 

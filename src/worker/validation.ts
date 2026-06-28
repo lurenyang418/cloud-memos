@@ -1,10 +1,11 @@
 import { zValidator } from "@hono/zod-validator";
 import type { Context } from "hono";
-import type { ZodType } from "zod";
+import { ZodError, type ZodType } from "zod";
 
 function validationHook(result: { success: boolean; error?: unknown }, c: Context) {
   if (!result.success) {
-    return c.json({ error: { code: "VALIDATION_ERROR", message: "请求参数无效", details: result.error } }, 400);
+    const message = result.error instanceof ZodError ? result.error.issues[0]?.message : undefined;
+    return c.json({ error: { code: "VALIDATION_ERROR", message: message ?? "请求参数无效", details: result.error } }, 400);
   }
 }
 
