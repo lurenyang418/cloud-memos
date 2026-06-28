@@ -160,6 +160,15 @@ test("collapses the desktop sidebar and remembers the preference", async ({ page
   await page.getByRole("button", { name: "登录" }).click();
   const frame = page.locator(".app-frame");
   const expandedWidth = await page.locator(".sidebar").evaluate((element) => element.getBoundingClientRect().width);
+  expect(expandedWidth).toBeLessThanOrEqual(220);
+  const sidebarGap = await page.evaluate(() => {
+    const sidebar = document.querySelector(".sidebar")!.getBoundingClientRect();
+    const column = document.querySelector(".page-column")!.getBoundingClientRect();
+    return column.left - sidebar.right;
+  });
+  expect(sidebarGap).toBeLessThan(180);
+  const layoutOverflows = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
+  expect(layoutOverflows).toBe(false);
   await page.getByRole("button", { name: "折叠侧边栏" }).click();
   await expect(frame).toHaveClass(/sidebar-collapsed/);
   await expect.poll(() => page.locator(".sidebar").evaluate((element) => element.getBoundingClientRect().width)).toBeLessThan(expandedWidth);
