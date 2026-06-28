@@ -12,6 +12,7 @@
     {
       "binding": "DB",
       "database_name": "cloud-memos",
+      "database_id": "bf0ceb16-def2-4842-9a77-054df80fcc0c",
       "migrations_dir": "./migrations"
     }
   ],
