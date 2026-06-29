@@ -45,9 +45,12 @@ test("initializes, captures a memo, filters by tag, and opens its public page", 
   await expect(page.getByRole("heading", { name: "我的记录" })).toBeVisible();
   const settingsUpdate = await page.request.patch("/api/v1/admin/settings", {
     headers: { origin: "http://127.0.0.1:5173" },
-    data: { contactLabel: "申请加入", contactUrl: "mailto:owner@example.com" },
+    data: { appName: "E2E Notes", contactLabel: "申请加入", contactUrl: "mailto:owner@example.com" },
   });
   expect(settingsUpdate.ok()).toBe(true);
+  await page.reload();
+  await expect(page).toHaveTitle("E2E Notes");
+  await expect(page.locator('link[rel="icon"]')).toHaveAttribute("href", "/favicon.svg");
   const composerWidth = await page.locator("form.composer").evaluate((element) => element.getBoundingClientRect().width);
   const editorWidth = await page.getByLabel("写一条 Memo").evaluate((element) => element.getBoundingClientRect().width);
   expect(editorWidth / composerWidth).toBeGreaterThan(0.98);
@@ -211,6 +214,7 @@ test("keeps the capture flow usable on a mobile viewport", async ({ page }) => {
 
 test("uses the public feed as the anonymous homepage", async ({ page }) => {
   await page.goto("/");
+  await expect(page).toHaveTitle("E2E Notes");
   await expect(page.getByRole("heading", { name: "公开动态" })).toBeVisible();
   await expect(page.getByRole("link", { name: "登录" })).toHaveAttribute("href", "/login");
   await expect(page.getByRole("link", { name: "申请加入" })).toHaveAttribute("href", "mailto:owner@example.com");

@@ -48,7 +48,7 @@ describe.sequential("worker integration", () => {
     expect(repeated.status).toBe(409);
     const session = await request("/api/v1/session", undefined, adminCookie);
     expect(session.status).toBe(200);
-    expect(await json<{ viewer: { role: string; username: string } }>(session)).toMatchObject({ viewer: { role: "ADMIN", username: "admin" } });
+    expect(await json<{ viewer: { role: string; username: string }; appName: string }>(session)).toMatchObject({ viewer: { role: "ADMIN", username: "admin" }, appName: "Cloud Memos" });
   });
 
   it("requires invitations and consumes an invitation exactly once", async () => {
@@ -126,23 +126,31 @@ describe.sequential("worker integration", () => {
   it("lets only admins configure a safe public contact link", async () => {
     const forbidden = await request("/api/v1/admin/settings", {
       method: "PATCH",
-      body: JSON.stringify({ contactLabel: "联系站长", contactUrl: "mailto:owner@example.com" }),
+      body: JSON.stringify({ appName: "Member Memos", contactLabel: "联系站长", contactUrl: "mailto:owner@example.com" }),
     }, memberCookie);
     expect(forbidden.status).toBe(403);
 
     const unsafe = await request("/api/v1/admin/settings", {
       method: "PATCH",
-      body: JSON.stringify({ contactLabel: "联系站长", contactUrl: "javascript:alert(1)" }),
+      body: JSON.stringify({ appName: "Edge Notes", contactLabel: "联系站长", contactUrl: "javascript:alert(1)" }),
     }, adminCookie);
     expect(unsafe.status).toBe(400);
 
+    const invalidName = await request("/api/v1/admin/settings", {
+      method: "PATCH",
+      body: JSON.stringify({ appName: "Bad\nName", contactLabel: "联系站长", contactUrl: "mailto:owner@example.com" }),
+    }, adminCookie);
+    expect(invalidName.status).toBe(400);
+    expect(await json<{ error: { message: string } }>(invalidName)).toMatchObject({ error: { message: "网站名称不能包含控制字符" } });
+
     const update = await request("/api/v1/admin/settings", {
       method: "PATCH",
-      body: JSON.stringify({ contactLabel: "联系站长", contactUrl: "mailto:owner@example.com" }),
+      body: JSON.stringify({ appName: "Edge Notes", contactLabel: "联系站长", contactUrl: "mailto:owner@example.com" }),
     }, adminCookie);
     expect(update.status).toBe(200);
     const session = await request("/api/v1/session");
-    expect(await json<{ publicContact: { label: string; url: string } }>(session)).toMatchObject({
+    expect(await json<{ appName: string; publicContact: { label: string; url: string } }>(session)).toMatchObject({
+      appName: "Edge Notes",
       publicContact: { label: "联系站长", url: "mailto:owner@example.com" },
     });
   });

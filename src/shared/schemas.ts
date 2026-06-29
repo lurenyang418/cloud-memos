@@ -67,6 +67,10 @@ export const updateUserStatusSchema = z.object({
 });
 
 export const updateInstanceSettingsSchema = z.object({
+  appName: z.string().trim().min(1, "网站名称不能为空").max(40, "网站名称不能超过 40 个字符").refine(
+    (value) => Array.from(value).every((character) => character.charCodeAt(0) >= 32 && character.charCodeAt(0) !== 127),
+    "网站名称不能包含控制字符",
+  ),
   contactLabel: z.string().trim().min(1).max(30),
   contactUrl: z.string().trim().max(500).refine((value) => {
     if (value === "") return true;

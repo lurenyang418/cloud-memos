@@ -8,18 +8,18 @@ import { createAuth } from "../auth";
 import { hashPassword, hashToken, timingSafeStringEqual } from "../crypto";
 import { HttpError } from "../http";
 import { optionalViewer } from "../middleware";
-import { getPublicContact } from "../settings";
+import { getInstanceConfiguration } from "../settings";
 import { validateJson } from "../validation";
 
 export const authRoutes = new Hono<AppEnv>();
 
 authRoutes.get("/session", async (c) => {
-  const [viewer, count, publicContact] = await Promise.all([
+  const [viewer, count, instance] = await Promise.all([
     optionalViewer(c),
     c.env.DB.prepare("SELECT COUNT(*) AS count FROM users").first<{ count: number }>("count"),
-    getPublicContact(c.env),
+    getInstanceConfiguration(c.env),
   ]);
-  return c.json({ viewer, setupRequired: Number(count ?? 0) === 0, appName: c.env.APP_NAME, publicContact });
+  return c.json({ viewer, setupRequired: Number(count ?? 0) === 0, appName: instance.appName, publicContact: instance.publicContact });
 });
 
 authRoutes.post("/setup", validateJson(setupSchema), async (c) => {

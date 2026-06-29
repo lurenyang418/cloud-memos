@@ -7,21 +7,21 @@ import type { AppEnv } from "../bindings";
 import { createToken, hashToken } from "../crypto";
 import { HttpError } from "../http";
 import { requireAdmin } from "../middleware";
-import { getPublicContact, savePublicContact } from "../settings";
+import { getInstanceConfiguration, saveInstanceConfiguration } from "../settings";
 import { validateJson } from "../validation";
 
 export const adminRoutes = new Hono<AppEnv>();
 adminRoutes.use("*", requireAdmin);
 
 adminRoutes.get("/settings", async (c) => {
-  const contact = await getPublicContact(c.env);
-  return c.json({ contactLabel: contact?.label ?? "申请加入", contactUrl: contact?.url ?? "" });
+  const settings = await getInstanceConfiguration(c.env);
+  return c.json({ appName: settings.appName, contactLabel: settings.publicContact?.label ?? "申请加入", contactUrl: settings.publicContact?.url ?? "" });
 });
 
 adminRoutes.patch("/settings", validateJson(updateInstanceSettingsSchema), async (c) => {
   const input = c.req.valid("json");
-  await savePublicContact(c.env, input);
-  return c.json({ contactLabel: input.contactLabel, contactUrl: input.contactUrl });
+  await saveInstanceConfiguration(c.env, input);
+  return c.json(input);
 });
 
 adminRoutes.get("/users", async (c) => {

@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { LoaderCircle } from "lucide-react";
+import { useEffect } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { getSession, type SessionResponse } from "./api";
 import { AppShell } from "./components/AppShell";
@@ -44,6 +45,10 @@ function ProtectedRoutes({ session }: { session: SessionResponse }) {
 
 export function App() {
   const sessionQuery = useQuery({ queryKey: ["session"], queryFn: getSession });
+  const appName = sessionQuery.data?.appName;
+  useEffect(() => {
+    if (appName) document.title = appName;
+  }, [appName]);
   if (sessionQuery.isPending) return <LoadingScreen />;
   if (sessionQuery.isError) return <div className="error-screen">无法连接服务：{sessionQuery.error.message}</div>;
   const session = sessionQuery.data;
