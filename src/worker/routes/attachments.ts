@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { createAttachmentSchema } from "../../shared/schemas";
 import type { AppEnv } from "../bindings";
 import { HttpError } from "../http";
-import { optionalViewer, requireUser } from "../middleware";
+import { optionalViewer, requireWrite } from "../middleware";
 import { validateJson } from "../validation";
 
 interface AttachmentAccessRow {
@@ -39,7 +39,7 @@ function canReadAttachment(row: AttachmentAccessRow, viewerId: string | null): b
 
 export const attachmentRoutes = new Hono<AppEnv>();
 
-attachmentRoutes.post("/attachments", requireUser, validateJson(createAttachmentSchema), async (c) => {
+attachmentRoutes.post("/attachments", requireWrite, validateJson(createAttachmentSchema), async (c) => {
   const input = c.req.valid("json");
   const maxBytes = Number(c.env.ATTACHMENT_MAX_BYTES);
   if (input.size > maxBytes) throw new HttpError(413, "ATTACHMENT_TOO_LARGE", `附件不能超过 ${Math.floor(maxBytes / 1024 / 1024)} MiB`);
@@ -53,7 +53,7 @@ attachmentRoutes.post("/attachments", requireUser, validateJson(createAttachment
   return c.json({ id, filename: input.filename, contentType: input.contentType, size: input.size, status: "PENDING", uploadUrl: `/api/v1/attachments/${id}/content` }, 201);
 });
 
-attachmentRoutes.put("/attachments/:id/content", requireUser, async (c) => {
+attachmentRoutes.put("/attachments/:id/content", requireWrite, async (c) => {
   const attachmentId = c.req.param("id");
   if (!attachmentId) throw new HttpError(400, "INVALID_ATTACHMENT_ID", "附件 ID 无效");
   const row = await attachmentRow(c, attachmentId);
@@ -93,7 +93,7 @@ attachmentRoutes.get("/attachments/:id/content", async (c) => {
   return new Response(object.body, { headers });
 });
 
-attachmentRoutes.delete("/attachments/:id", requireUser, async (c) => {
+attachmentRoutes.delete("/attachments/:id", requireWrite, async (c) => {
   const attachmentId = c.req.param("id");
   if (!attachmentId) throw new HttpError(400, "INVALID_ATTACHMENT_ID", "附件 ID 无效");
   const row = await attachmentRow(c, attachmentId);

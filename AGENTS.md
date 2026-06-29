@@ -41,7 +41,10 @@ pnpm audit --prod
 - `PRIVATE` 仅作者可读；`MEMBERS` 仅 ACTIVE 登录用户可读；`PUBLIC` 才能匿名访问。
 - 归档 Memo 只允许作者读取。
 - 附件 bucket 始终私有，下载必须重新执行 Memo 权限判断。
-- 所有写接口必须保留 Origin/CSRF、会话、所有权和 Zod 校验。
+- Cookie 写接口必须保留 Origin/CSRF、会话、所有权和 Zod 校验；Bearer 内容写接口不依赖 Origin，但必须验证 `memos:write`。
+- API token 只保存 SHA-256 哈希，明文只在创建响应出现一次；停用用户、过期或撤销 token 必须立即失效。
+- 管理、邀请、密码、恢复、实例设置和 API token 管理接口只接受 Cookie 会话，不得接受 Bearer。
+- ZIP 导入必须先在浏览器校验路径、清单、大小和声明文件；服务端仍需独立校验元数据、附件所有权和幂等来源键。
 - 邀请、恢复、初始化 token 必须使用密码学随机数并以哈希或 Worker Secret 保存。
 - 密码继续使用版本化 scrypt；改变参数或格式时必须提供升级方案和远程 Workers 验证。
 - 不把请求状态存放在模块级可变变量中；所有 Promise 必须 await、return 或交给 `ctx.waitUntil()`。

@@ -63,6 +63,7 @@ export async function downloadAllMemos(viewer: Viewer, onProgress: ExportProgres
 
   const manifest = {
     formatVersion: 1,
+    exportId: crypto.randomUUID(),
     exportedAt: exportedAt.toISOString(),
     owner: {
       id: viewer.id,

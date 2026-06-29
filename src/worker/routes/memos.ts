@@ -5,7 +5,7 @@ import type { AppEnv } from "../bindings";
 import { decodeCursor, encodeCursor } from "../cursor";
 import { HttpError } from "../http";
 import { getMemoById, getOwnedMemo, hydrateMemos, memoSelect, type MemoRow } from "../memo-data";
-import { optionalViewer, requireUser } from "../middleware";
+import { optionalViewer, requireUser, requireWrite } from "../middleware";
 import { extractTags, normalizeTag } from "../tags";
 import { validateJson, validateQuery } from "../validation";
 
@@ -95,7 +95,7 @@ memoRoutes.get("/feed", requireUser, validateQuery(listMemosSchema), async (c) =
   return c.json(response);
 });
 
-memoRoutes.post("/memos", requireUser, validateJson(createMemoSchema), async (c) => {
+memoRoutes.post("/memos", requireWrite, validateJson(createMemoSchema), async (c) => {
   const viewer = c.get("viewer");
   const input = c.req.valid("json");
   if (input.attachmentIds.length > 0) {
@@ -130,7 +130,7 @@ memoRoutes.get("/memos/:id", async (c) => {
   return c.json(await getMemoById(c.env, c.req.param("id"), viewer?.status === "ACTIVE" ? viewer.id : null));
 });
 
-memoRoutes.patch("/memos/:id", requireUser, validateJson(updateMemoSchema), async (c) => {
+memoRoutes.patch("/memos/:id", requireWrite, validateJson(updateMemoSchema), async (c) => {
   const viewer = c.get("viewer");
   const input = c.req.valid("json");
   const assignments: string[] = [];
@@ -164,7 +164,7 @@ memoRoutes.patch("/memos/:id", requireUser, validateJson(updateMemoSchema), asyn
   return c.json(await getOwnedMemo(c.env, c.req.param("id"), viewer.id));
 });
 
-memoRoutes.delete("/memos/:id", requireUser, async (c) => {
+memoRoutes.delete("/memos/:id", requireWrite, async (c) => {
   const viewer = c.get("viewer");
   const memoId = c.req.param("id");
   const attachmentResult = await c.env.DB.prepare(
@@ -175,7 +175,8 @@ memoRoutes.delete("/memos/:id", requireUser, async (c) => {
       .bind(Date.now(), memoId, viewer.id),
     c.env.DB.prepare("DELETE FROM memos WHERE id = ? AND creator_id = ?").bind(memoId, viewer.id),
   ]);
-  if (results[1].meta.changes !== 1) throw new HttpError(404, "MEMO_NOT_FOUND", "Memo 不存在");
+  // FTS and foreign-key work can be included in D1's change count.
+  if (results[1].meta.changes === 0) throw new HttpError(404, "MEMO_NOT_FOUND", "Memo 不存在");
 
   if (attachmentResult.results.length > 0) {
     c.executionCtx.waitUntil((async () => {

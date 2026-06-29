@@ -6,6 +6,8 @@ export type MemoState = (typeof memoStates)[number];
 
 export type UserRole = "ADMIN" | "USER";
 export type UserStatus = "ACTIVE" | "SUSPENDED";
+export const apiScopes = ["memos:read", "memos:write"] as const;
+export type ApiScope = (typeof apiScopes)[number];
 
 export interface Viewer {
   id: string;
@@ -62,4 +64,15 @@ export interface ApiErrorBody {
     message: string;
     details?: unknown;
   };
+}
+
+export interface ApiTokenSummary {
+  id: string;
+  name: string;
+  tokenPrefix: string;
+  scopes: ApiScope[];
+  expiresAt: number;
+  lastUsedAt: number | null;
+  revokedAt: number | null;
+  createdAt: number;
 }

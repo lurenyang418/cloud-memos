@@ -106,6 +106,23 @@ export const recoveryTokens = sqliteTable(
   (table) => [uniqueIndex("recovery_token_hash_unique").on(table.tokenHash)],
 );
 
+export const apiTokens = sqliteTable(
+  "api_tokens",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    tokenPrefix: text("token_prefix").notNull(),
+    tokenHash: text("token_hash").notNull(),
+    scopes: text("scopes").notNull(),
+    expiresAt: integer("expires_at").notNull(),
+    lastUsedAt: integer("last_used_at"),
+    revokedAt: integer("revoked_at"),
+    createdAt: integer("created_at").notNull(),
+  },
+  (table) => [uniqueIndex("api_tokens_token_hash_unique").on(table.tokenHash), index("api_tokens_user_created_idx").on(table.userId, table.createdAt)],
+);
+
 export const memos = sqliteTable(
   "memos",
   {
@@ -153,6 +170,18 @@ export const attachments = sqliteTable(
   (table) => [index("attachments_creator_idx").on(table.creatorId), index("attachments_memo_idx").on(table.memoId), uniqueIndex("attachments_object_key_unique").on(table.objectKey)],
 );
 
+export const memoImports = sqliteTable(
+  "memo_imports",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    sourceKey: text("source_key").notNull(),
+    memoId: text("memo_id").notNull().references(() => memos.id, { onDelete: "cascade" }),
+    createdAt: integer("created_at").notNull(),
+  },
+  (table) => [uniqueIndex("memo_imports_user_source_unique").on(table.userId, table.sourceKey), uniqueIndex("memo_imports_memo_unique").on(table.memoId)],
+);
+
 export const userRelations = relations(users, ({ many }) => ({ memos: many(memos), sessions: many(sessions) }));
 export const memoRelations = relations(memos, ({ one, many }) => ({
   author: one(users, { fields: [memos.creatorId], references: [users.id] }),
@@ -165,4 +194,4 @@ export const attachmentRelations = relations(attachments, ({ one }) => ({
   creator: one(users, { fields: [attachments.creatorId], references: [users.id] }),
 }));
 
-export const schema = { users, sessions, accounts, verifications, rateLimits, instanceSettings, invitations, recoveryTokens, memos, memoTags, attachments };
+export const schema = { users, sessions, accounts, verifications, rateLimits, instanceSettings, invitations, recoveryTokens, apiTokens, memos, memoTags, attachments, memoImports };

@@ -8,6 +8,8 @@ let memberCookie = "";
 let memberId = "";
 let publicMemoId = "";
 let privateMemoId = "";
+let readToken = "";
+let writeToken = "";
 
 async function request(path: string, init?: RequestInit, cookie?: string) {
   const headers = new Headers(init?.headers);
@@ -210,6 +212,150 @@ describe.sequential("worker integration", () => {
       body: JSON.stringify({ content: "cross origin", visibility: "PRIVATE", attachmentIds: [] }),
     }, adminCookie);
     expect(csrf.status).toBe(403);
+  });
+
+  it("creates hashed API tokens and enforces scopes and session-only administration", async () => {
+    const createRead = await request("/api/v1/api-tokens", {
+      method: "POST",
+      body: JSON.stringify({ name: "read cli", mode: "read-only", expiresInDays: 365 }),
+    }, adminCookie);
+    expect(createRead.status).toBe(201);
+    readToken = (await json<{ token: string }>(createRead)).token;
+    expect(readToken).toMatch(/^cm_pat_[A-Za-z0-9_-]+_[A-Za-z0-9_-]+$/);
+    const stored = await env.DB.prepare("SELECT token_hash AS tokenHash FROM api_tokens WHERE name = ?").bind("read cli").first<{ tokenHash: string }>();
+    expect(stored?.tokenHash).not.toBe(readToken);
+    expect(stored?.tokenHash).toHaveLength(64);
+    const summaries = await request("/api/v1/api-tokens", undefined, adminCookie);
+    const summariesText = await summaries.text();
+    expect(summariesText).not.toContain(readToken);
+    expect(summariesText).not.toContain("tokenHash");
+
+    const readHeaders = { authorization: `Bearer ${readToken}` };
+    expect((await request("/api/v1/memos", { headers: readHeaders })).status).toBe(200);
+    const deniedWrite = await request("/api/v1/memos", {
+      method: "POST", headers: readHeaders, body: JSON.stringify({ content: "denied", visibility: "PRIVATE", attachmentIds: [] }),
+    });
+    expect(deniedWrite.status).toBe(403);
+    expect(await json<{ error: { code: string } }>(deniedWrite)).toMatchObject({ error: { code: "INSUFFICIENT_SCOPE" } });
+    expect((await request("/api/v1/api-tokens", { headers: readHeaders })).status).toBe(403);
+    expect((await request("/api/v1/admin/users", { headers: readHeaders })).status).toBe(403);
+    const invalid = await request("/api/v1/memos", { headers: { authorization: "Bearer cm_pat_invalid_invalidinvalidinvalidinvalid" } });
+    expect(invalid.status).toBe(401);
+    expect(await json<{ error: { code: string } }>(invalid)).toMatchObject({ error: { code: "INVALID_API_TOKEN" } });
+
+    const createWrite = await request("/api/v1/api-tokens", {
+      method: "POST", body: JSON.stringify({ name: "write cli", mode: "read-write", expiresInDays: 30 }),
+    }, adminCookie);
+    writeToken = (await json<{ token: string }>(createWrite)).token;
+    const bearerWrite = await request("/api/v1/memos", {
+      method: "POST",
+      headers: { authorization: `Bearer ${writeToken}`, origin: "https://cli.example" },
+      body: JSON.stringify({ content: "created through api", visibility: "PRIVATE", attachmentIds: [] }),
+    });
+    expect(bearerWrite.status).toBe(201);
+    const apiMemo = await json<{ id: string; version: number }>(bearerWrite);
+    const search = await request("/api/v1/memos?q=through", { headers: { authorization: `Bearer ${writeToken}` } });
+    expect((await json<{ items: Array<{ id: string }> }>(search)).items.map((item) => item.id)).toContain(apiMemo.id);
+    const update = await request(`/api/v1/memos/${apiMemo.id}`, {
+      method: "PATCH", headers: { authorization: `Bearer ${writeToken}` }, body: JSON.stringify({ pinned: true, version: apiMemo.version }),
+    });
+    expect(update.status).toBe(200);
+    const stale = await request(`/api/v1/memos/${apiMemo.id}`, {
+      method: "PATCH", headers: { authorization: `Bearer ${writeToken}` }, body: JSON.stringify({ state: "ARCHIVED", version: apiMemo.version }),
+    });
+    expect(stale.status).toBe(409);
+    const archived = await request(`/api/v1/memos/${apiMemo.id}`, {
+      method: "PATCH", headers: { authorization: `Bearer ${writeToken}` }, body: JSON.stringify({ state: "ARCHIVED", version: 2 }),
+    });
+    expect(archived.status).toBe(200);
+
+    const attachmentContent = "bearer file";
+    const pendingResponse = await request("/api/v1/attachments", {
+      method: "POST", headers: { authorization: `Bearer ${writeToken}` }, body: JSON.stringify({ filename: "bearer.txt", contentType: "text/plain", size: attachmentContent.length }),
+    });
+    const pending = await json<{ id: string; uploadUrl: string }>(pendingResponse);
+    expect((await request(pending.uploadUrl, {
+      method: "PUT", headers: { authorization: `Bearer ${writeToken}`, "content-type": "text/plain", "content-length": String(attachmentContent.length) }, body: attachmentContent,
+    })).status).toBe(200);
+    const attachmentMemoResponse = await request("/api/v1/memos", {
+      method: "POST", headers: { authorization: `Bearer ${writeToken}` }, body: JSON.stringify({ content: "api attachment", visibility: "PRIVATE", attachmentIds: [pending.id] }),
+    });
+    const attachmentMemo = await json<{ id: string }>(attachmentMemoResponse);
+    const download = await request(`/api/v1/attachments/${pending.id}/content`, { headers: { authorization: `Bearer ${writeToken}` } });
+    expect(await download.text()).toBe(attachmentContent);
+    expect((await request(`/api/v1/memos/${attachmentMemo.id}`, { method: "DELETE", headers: { authorization: `Bearer ${writeToken}` } })).status).toBe(204);
+    expect((await request(`/api/v1/memos/${apiMemo.id}`, { method: "DELETE", headers: { authorization: `Bearer ${writeToken}` } })).status).toBe(204);
+
+    expect((await request("/api/auth/change-password", { method: "POST", headers: { authorization: `Bearer ${writeToken}` }, body: JSON.stringify({ currentPassword: "admin1234", newPassword: "changed88" }) })).status).not.toBe(200);
+  });
+
+  it("invalidates revoked, expired and suspended-user tokens immediately", async () => {
+    const rows = await request("/api/v1/api-tokens", undefined, adminCookie);
+    const tokenId = (await json<{ items: Array<{ id: string; name: string }> }>(rows)).items.find((item) => item.name === "read cli")?.id;
+    expect(tokenId).toBeTruthy();
+    expect((await request(`/api/v1/api-tokens/${tokenId}`, { method: "DELETE" }, adminCookie)).status).toBe(204);
+    expect((await request(`/api/v1/api-tokens/${tokenId}`, { method: "DELETE" }, adminCookie)).status).toBe(204);
+    expect((await request("/api/v1/memos", { headers: { authorization: `Bearer ${readToken}` } })).status).toBe(401);
+
+    await env.DB.prepare("UPDATE api_tokens SET expires_at = ? WHERE name = ?").bind(Date.now() - 1, "write cli").run();
+    expect((await request("/api/v1/memos", { headers: { authorization: `Bearer ${writeToken}` } })).status).toBe(401);
+
+    const memberTokenResponse = await request("/api/v1/api-tokens", {
+      method: "POST", body: JSON.stringify({ name: "member cli", mode: "read-only", expiresInDays: 7 }),
+    }, memberCookie);
+    const memberToken = (await json<{ token: string }>(memberTokenResponse)).token;
+    await request(`/api/v1/admin/users/${memberId}`, { method: "PATCH", body: JSON.stringify({ status: "SUSPENDED" }) }, adminCookie);
+    expect((await request("/api/v1/memos", { headers: { authorization: `Bearer ${memberToken}` } })).status).toBe(401);
+    await request(`/api/v1/admin/users/${memberId}`, { method: "PATCH", body: JSON.stringify({ status: "ACTIVE" }) }, adminCookie);
+    const login = await request("/api/auth/sign-in/email", {
+      method: "POST", body: JSON.stringify({ email: "member@example.com", password: "pass1234" }),
+    });
+    expect(login.status).toBe(200);
+    memberCookie = login.headers.get("set-cookie")?.split(";")[0] ?? "";
+  });
+
+  it("imports memo metadata and attachments idempotently per user", async () => {
+    const content = "imported attachment";
+    const createAttachment = await request("/api/v1/attachments", {
+      method: "POST", body: JSON.stringify({ filename: "import.txt", contentType: "text/plain", size: content.length }),
+    }, memberCookie);
+    const attachment = await json<{ id: string; uploadUrl: string }>(createAttachment);
+    expect((await request(attachment.uploadUrl, {
+      method: "PUT", headers: { "content-type": "text/plain", "content-length": String(content.length) }, body: content,
+    }, memberCookie)).status).toBe(200);
+
+    const sourceKey = "11111111-1111-4111-8111-111111111111:22222222-2222-4222-8222-222222222222";
+    const imported = await request("/api/v1/import/memos", {
+      method: "POST",
+      body: JSON.stringify({ sourceKey, content: "restored #标签", visibility: "PUBLIC", state: "ARCHIVED", pinned: true, version: 7, createdAt: 1_700_000_000_000, updatedAt: 1_700_000_001_000, attachmentIds: [attachment.id] }),
+    }, memberCookie);
+    expect(imported.status).toBe(201);
+    const first = await json<{ imported: boolean; memo: { id: string; visibility: string; state: string; pinned: boolean; version: number; createdAt: number; attachments: Array<{ id: string }> } }>(imported);
+    expect(first).toMatchObject({ imported: true, memo: { visibility: "PUBLIC", state: "ARCHIVED", pinned: true, version: 7, createdAt: 1_700_000_000_000, attachments: [{ id: attachment.id }] } });
+    const repeated = await request("/api/v1/import/memos", {
+      method: "POST",
+      body: JSON.stringify({ sourceKey, content: "ignored", visibility: "PRIVATE", state: "ACTIVE", pinned: false, version: 1, createdAt: 1, updatedAt: 1, attachmentIds: [] }),
+    }, memberCookie);
+    expect(repeated.status).toBe(200);
+    expect(await json<{ imported: boolean; memo: { id: string } }>(repeated)).toMatchObject({ imported: false, memo: { id: first.memo.id } });
+    const checked = await request("/api/v1/import/check", { method: "POST", body: JSON.stringify({ sourceKeys: [sourceKey] }) }, memberCookie);
+    expect(await json<{ items: Array<{ sourceKey: string; memoId: string }> }>(checked)).toMatchObject({ items: [{ sourceKey, memoId: first.memo.id }] });
+
+    const otherUser = await request("/api/v1/import/memos", {
+      method: "POST",
+      body: JSON.stringify({ sourceKey, content: "admin copy", visibility: "MEMBERS", state: "ACTIVE", pinned: false, version: 2, createdAt: 2, updatedAt: 3, attachmentIds: [] }),
+    }, adminCookie);
+    expect(otherUser.status).toBe(201);
+    expect((await json<{ memo: { id: string } }>(otherUser)).memo.id).not.toBe(first.memo.id);
+  });
+
+  it("serves an OpenAPI document for the token and import APIs", async () => {
+    const response = await request("/api/v1/openapi.json");
+    expect(response.status).toBe(200);
+    const document = await json<{ openapi: string; paths: Record<string, unknown> }>(response);
+    expect(document.openapi).toBe("3.1.0");
+    expect(document.paths).toHaveProperty("/api/v1/api-tokens");
+    expect(document.paths).toHaveProperty("/api/v1/import/memos");
   });
 
   it("paginates without duplicates", async () => {

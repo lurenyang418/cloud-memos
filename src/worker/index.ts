@@ -3,11 +3,14 @@ import { secureHeaders } from "hono/secure-headers";
 import type { AppBindings, AppEnv } from "./bindings";
 import { createAuth } from "./auth";
 import { errorResponse, HttpError } from "./http";
+import { openApiDocument } from "./openapi";
 import { enforceSameOrigin } from "./middleware";
 import { adminRoutes } from "./routes/admin";
+import { apiTokenRoutes } from "./routes/api-tokens";
 import { attachmentRoutes } from "./routes/attachments";
 import { authRoutes } from "./routes/auth";
 import { memoRoutes } from "./routes/memos";
+import { importRoutes } from "./routes/imports";
 import { publicRoutes } from "./routes/public";
 
 export const app = new Hono<AppEnv>();
@@ -28,10 +31,14 @@ app.use("*", secureHeaders({
 
 app.use("/api/v1/*", enforceSameOrigin);
 
+app.get("/api/v1/openapi.json", (c) => c.json(openApiDocument));
+
 app.all("/api/auth/*", (c) => createAuth(c.env, c.req.url, c.executionCtx).handler(c.req.raw));
 app.route("/api/v1", authRoutes);
+app.route("/api/v1", apiTokenRoutes);
 app.route("/api/v1", memoRoutes);
 app.route("/api/v1", attachmentRoutes);
+app.route("/api/v1", importRoutes);
 app.route("/api/v1/public", publicRoutes);
 app.route("/api/v1/admin", adminRoutes);
 
@@ -56,7 +63,7 @@ app.onError((error, c) => {
 async function cleanup(env: AppBindings): Promise<void> {
   const cutoff = Date.now() - 24 * 60 * 60 * 1000;
   const stale = await env.DB.prepare(
-    "SELECT id, object_key AS objectKey FROM attachments WHERE status = 'DELETING' OR (status = 'PENDING' AND created_at < ?) LIMIT 500",
+    "SELECT id, object_key AS objectKey FROM attachments WHERE status = 'DELETING' OR (memo_id IS NULL AND status IN ('PENDING', 'READY') AND created_at < ?) LIMIT 500",
   ).bind(cutoff).all<{ id: string; objectKey: string }>();
   if (stale.results.length > 0) {
     await env.ATTACHMENTS.delete(stale.results.map((row) => row.objectKey));

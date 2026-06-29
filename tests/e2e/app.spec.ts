@@ -132,6 +132,8 @@ test("initializes, captures a memo, filters by tag, and opens its public page", 
 
   await page.getByRole("link", { name: "返回应用" }).click();
   await page.getByRole("link", { name: "设置" }).click();
+  const transferCard = page.locator(".settings-card").filter({ has: page.getByRole("heading", { name: "内容迁移" }) });
+  await expect(transferCard).toHaveCount(1);
   const zipDownloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "导出 ZIP" }).click();
   const zipDownload = await zipDownloadPromise;
@@ -145,6 +147,23 @@ test("initializes, captures a memo, filters by tag, and opens its public page", 
   expect(zipText).toContain(resolvedContent);
   expect(zipText).toContain("export-note.txt");
   expect(zipText).toContain("portable attachment");
+
+  const tokenCard = page.locator(".settings-card").filter({ has: page.getByRole("heading", { name: "API 令牌" }) });
+  const tokenControlTops = await tokenCard.locator(".token-form").evaluate((form) => Array.from(form.querySelectorAll("input, select, button")).slice(0, 4).map((element) => element.getBoundingClientRect().top));
+  expect(Math.max(...tokenControlTops) - Math.min(...tokenControlTops)).toBeLessThan(2);
+  await tokenCard.getByLabel("名称").fill("E2E CLI");
+  await tokenCard.getByRole("button", { name: "创建令牌" }).click();
+  await expect(tokenCard.getByText("请立即复制，关闭后无法再次查看")).toBeVisible();
+  const token = await tokenCard.locator(".token-secret code").textContent();
+  expect(token).toMatch(/^cm_pat_/);
+  const tokenRequest = await page.request.get("/api/v1/memos", { headers: { authorization: `Bearer ${token}` } });
+  expect(tokenRequest.ok()).toBe(true);
+
+  await transferCard.getByRole("tab", { name: "导入" }).click();
+  await transferCard.locator('input[type="file"]').setInputFiles(zipPath!);
+  await expect(transferCard.getByRole("status")).toContainText("导入完成：新增", { timeout: 30_000 });
+  await transferCard.locator('input[type="file"]').setInputFiles(zipPath!);
+  await expect(transferCard.getByRole("status")).toContainText("导入完成：新增 0 条", { timeout: 30_000 });
 
   await page.locator("button.button-danger", { hasText: "退出登录" }).click();
   await expect(page).toHaveURL(/\/login$/);

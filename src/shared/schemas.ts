@@ -1,6 +1,11 @@
 import { z } from "zod";
 import { memoStates, memoVisibilities } from "./types";
 
+const importSourceKeySchema = z.string().refine((value) => {
+  const [exportId, memoId, extra] = value.split(":");
+  return extra === undefined && z.string().uuid().safeParse(exportId).success && z.string().uuid().safeParse(memoId).success;
+}, "来源标识无效");
+
 export const usernameSchema = z
   .string()
   .trim()
@@ -80,4 +85,29 @@ export const createAttachmentSchema = z.object({
   ),
   contentType: z.string().trim().min(1).max(255).regex(/^[a-z0-9][a-z0-9!#$&^_.+-]*\/[a-z0-9][a-z0-9!#$&^_.+-]*$/i, "MIME 类型无效"),
   size: z.number().int().positive(),
+});
+
+export const createApiTokenSchema = z.object({
+  name: z.string().trim().min(1, "令牌名称不能为空").max(60, "令牌名称不能超过 60 个字符"),
+  mode: z.enum(["read-only", "read-write"]),
+  expiresInDays: z.number().int().min(1).max(365).default(365),
+});
+
+export const importCheckSchema = z.object({
+  sourceKeys: z.array(importSourceKeySchema).min(1).max(100),
+});
+
+export const importMemoSchema = z.object({
+  sourceKey: importSourceKeySchema,
+  content: z.string().min(1).max(100_000),
+  visibility: z.enum(memoVisibilities),
+  state: z.enum(memoStates),
+  pinned: z.boolean(),
+  version: z.number().int().positive(),
+  createdAt: z.number().int().nonnegative().safe(),
+  updatedAt: z.number().int().nonnegative().safe(),
+  attachmentIds: z.array(z.string().uuid()).max(20),
+}).refine((value) => value.updatedAt >= value.createdAt, {
+  message: "更新时间不能早于创建时间",
+  path: ["updatedAt"],
 });

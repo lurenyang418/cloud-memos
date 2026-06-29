@@ -7,7 +7,7 @@ Browser
   └─ Cloudflare Worker
        ├─ Workers Static Assets: React SPA
        ├─ Hono API + Better Auth
-       ├─ D1: users, sessions, memos, FTS5, settings
+       ├─ D1: users, sessions, API token hashes, memos, import keys, FTS5, settings
        └─ R2: private attachment objects
 ```
 
@@ -16,7 +16,7 @@ Browser
 ## 请求边界
 
 - `/api/auth/*`：Better Auth 会话和邮箱密码认证。
-- `/api/v1/*`：业务 API，写请求执行同源校验。
+- `/api/v1/*`：业务 API。Cookie 写请求执行同源校验；Bearer 内容请求执行 token 与 scope 校验。
 - `/api/v1/public/*`：仅返回 ACTIVE 用户的 ACTIVE/PUBLIC 内容。
 - 其他路径：由 Static Assets 提供 React SPA fallback。
 
@@ -27,6 +27,8 @@ Browser
 - FTS5 trigger 同步内容索引；中文查询额外使用受权限约束的 `instr()` 回退。
 - R2 只保存二进制，D1 保存 object key 和状态。上传采用 PENDING → READY 状态机。
 - Cron 清理过期 token、限流记录和未完成/失败删除的附件。
+- API token 只保存 SHA-256 哈希；`last_used_at` 最多每小时异步写入一次。
+- ZIP 使用 `${exportId}:${sourceMemoId}` 作为用户级幂等键。Memo、tag、附件关联和幂等记录通过 D1 batch 原子写入。
 
 ## 权限矩阵
 
@@ -43,7 +45,9 @@ Browser
 
 - 邀请制注册；首位管理员由一次性 bootstrap token 创建。
 - Secure、HttpOnly、SameSite Cookie，会话与账号停用联动。
+- 个人 API token 分为只读和读写 scope；令牌管理与所有管理类接口仍只接受 Cookie 会话。
 - 版本化 scrypt 密码哈希，恢复密码后撤销现有会话。
 - Markdown 禁止原始 HTML，并使用 rehype-sanitize。
 - HTML/SVG 等主动附件强制下载；图片类型受控内联。
 - 管理员邮箱默认不公开，匿名联系入口由管理员显式配置。
+- ZIP 在浏览器中逐项读取，并拒绝路径穿越、重复/缺失/未声明文件和超限内容；服务端再次校验所有权和大小。

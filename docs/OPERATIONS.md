@@ -30,6 +30,8 @@ pnpm exec wrangler d1 export cloud-memos --remote --output backups/cloud-memos.s
 - `BETTER_AUTH_SECRET`：轮换会使现有签名/会话失效，应安排维护窗口并通知用户重新登录。
 - GitHub/Cloudflare token：最小权限、定期轮换，泄露后立即撤销。
 
+个人 API token 不属于 Worker Secret，由用户在设置页自行创建和撤销。若怀疑泄露，应立即撤销对应 token；停用账号会即时阻止该账号的全部 token。数据库中仅保存 SHA-256 哈希，无法恢复明文。
+
 ## 事件响应
 
 1. 限制写入或回滚有问题的 Worker version。

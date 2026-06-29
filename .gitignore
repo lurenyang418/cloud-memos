@@ -14,4 +14,5 @@ temp/
 backups/
 *.backup.sql
 *.log
+*.cpuprofile
 .DS_Store

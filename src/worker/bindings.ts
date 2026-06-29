@@ -3,6 +3,8 @@ export type AppBindings = Env & {
   BOOTSTRAP_ADMIN_TOKEN: string;
 };
 
+import type { ApiScope } from "../shared/types";
+
 export interface AppVariables {
   viewer: {
     id: string;
@@ -12,6 +14,8 @@ export interface AppVariables {
     role: "ADMIN" | "USER";
     status: "ACTIVE" | "SUSPENDED";
   };
+  authType: "SESSION" | "API_TOKEN";
+  scopes: ApiScope[];
 }
 
 export type AppEnv = {
