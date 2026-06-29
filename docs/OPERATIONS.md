@@ -7,22 +7,21 @@
 - R2：上传/下载失败、对象数量、失败删除和存储增长。
 - Cron：每天 03:17 UTC 的清理执行结果。
 
-## 备份
+## 恢复点与备份
 
 ```bash
-mkdir -p backups
-pnpm exec wrangler d1 export cloud-memos --remote --output backups/cloud-memos.sql
+pnpm exec wrangler d1 time-travel info cloud-memos --env="" --json
 ```
 
-`backups/` 已被 Git 忽略。备份应加密后保存到独立位置，并设置保留期限。D1 导出不包含 R2 对象。
+把返回的 bookmark 与发布 tag、Worker version 一起记录。当前数据库使用 FTS5 virtual table，Wrangler 的 `d1 export` 不支持该 schema；不要把会失败的导出命令写入自动化备份。用户可以用设置页 ZIP 导出个人 Memo 和附件，运维侧仍需为 R2 配置独立复制或保留策略。
 
 ## 恢复演练
 
-1. 创建临时 D1 数据库。
-2. 导入 production 导出文件。
+1. 在 staging 记录恢复前 Time Travel bookmark，并确认没有需要保留的测试写入。
+2. 写入可验证的测试数据后，将 staging 恢复到该 bookmark。
 3. 检查 migration 表、用户数、Memo 数、FTS 查询和设置表。
-4. 将临时 Worker 绑定到恢复库执行只读 smoke test。
-5. 记录耗时和结果后删除临时资源。
+4. 对 staging Worker 执行只读 smoke test。
+5. 记录耗时和结果；不要在 production 首次尝试恢复流程。
 
 ## Secret 轮换
 

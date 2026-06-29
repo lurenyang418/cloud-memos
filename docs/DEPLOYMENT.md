@@ -63,7 +63,7 @@ git push origin v0.1.0
 
 - 仅代码问题：使用 `wrangler versions list` 查找上一个版本，然后 `wrangler rollback <VERSION_ID>`。
 - 向后兼容 migration：先回滚 Worker，保留新增表/列。
-- 数据破坏：停止写流量，使用 D1 Time Travel 或已验证导出恢复；不要在流量开放时覆盖数据库。
+- 数据破坏：停止写流量，使用发布前记录的 D1 Time Travel bookmark 恢复；不要在流量开放时覆盖数据库。当前 FTS5 schema 不支持 `d1 export`。
 - R2 数据不包含在 D1 备份中，必须按独立策略恢复。
 
 详细检查项见 [RELEASE_CHECKLIST.md](./RELEASE_CHECKLIST.md)。

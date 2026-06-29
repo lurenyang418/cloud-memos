@@ -166,13 +166,13 @@ pnpm check
 
 ## 备份与恢复
 
-定期导出 D1：
+生产 migration 前记录 D1 Time Travel bookmark：
 
 ```bash
-pnpm exec wrangler d1 export cloud-memos --remote --output backup.sql
+pnpm exec wrangler d1 time-travel info cloud-memos --env="" --json
 ```
 
-生产 migration 前记录 D1 Time Travel 恢复点，并确认 R2 bucket 的保留策略。D1 导出只包含附件元数据；R2 对象需要独立的复制或保留策略。
+当前 schema 包含 FTS5 virtual table，Wrangler 的 `d1 export` 会拒绝导出，不能把该命令作为备份方案。应记录 Time Travel bookmark，并定期在 staging 演练恢复。R2 对象不属于 D1 恢复范围，需要独立的复制或保留策略；用户级内容可额外使用设置页 ZIP 导出。
 
 恢复前停止写流量，在 staging 验证导出文件后再导入目标 D1。不要把生产备份、`.dev.vars` 或 API token 提交到仓库。
 

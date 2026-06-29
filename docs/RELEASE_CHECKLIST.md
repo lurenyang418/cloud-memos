@@ -22,7 +22,7 @@
 
 - [ ] 记录发布前 Worker version。
 - [ ] 记录 D1 Time Travel bookmark 或确认新空库状态。
-- [ ] D1 导出和临时恢复演练成功。
+- [ ] Time Travel 恢复流程已在 staging 定期演练；已知 FTS5 schema 不支持 `d1 export`。
 - [ ] 明确 R2 独立备份/保留策略。
 
 ## 发布与验收
