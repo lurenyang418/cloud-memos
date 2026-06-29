@@ -48,9 +48,21 @@ export interface Memo {
   version: number;
   createdAt: number;
   updatedAt: number;
+  deletedAt: number | null;
   author: MemoAuthor;
   tags: string[];
   attachments: Attachment[];
+}
+
+export interface MemoVersion {
+  id: string;
+  memoId: string;
+  content: string;
+  visibility: MemoVisibility;
+  state: MemoState;
+  pinned: boolean;
+  version: number;
+  createdAt: number;
 }
 
 export interface CursorPage<T> {

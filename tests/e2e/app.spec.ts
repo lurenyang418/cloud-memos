@@ -80,6 +80,31 @@ test("initializes, captures a memo, filters by tag, and opens its public page", 
   await expect(page.locator('img[src="x"]')).toHaveCount(0);
   await expect.poll(() => page.evaluate(() => (window as Window & { __pwned?: number }).__pwned)).toBeUndefined();
 
+  await page.getByLabel("写一条 Memo").evaluate((element) => {
+    const transfer = new DataTransfer();
+    transfer.items.add(new File([new Uint8Array([137, 80, 78, 71])], "pasted-image.png", { type: "image/png" }));
+    element.dispatchEvent(new ClipboardEvent("paste", { bubbles: true, cancelable: true, clipboardData: transfer }));
+  });
+  const pastedUpload = page.locator(".upload-chip").filter({ hasText: "pasted-image.png" });
+  await expect(pastedUpload).toBeVisible();
+  await pastedUpload.locator("button").click();
+
+  const shortcutMemo = `keyboard memo ${runId}`;
+  await page.getByLabel("写一条 Memo").fill(shortcutMemo);
+  await page.getByLabel("写一条 Memo").press("Control+Enter");
+  const shortcutCard = page.locator("article.memo-card").filter({ hasText: shortcutMemo });
+  await expect(shortcutCard).toBeVisible();
+  await shortcutCard.getByRole("button", { name: "删除", exact: true }).click();
+  await page.getByRole("button", { name: "移到回收站", exact: true }).click();
+  await expect(shortcutCard).toHaveCount(0);
+  await page.getByRole("link", { name: "回收站" }).click();
+  const trashedCard = page.locator("article.memo-card").filter({ hasText: shortcutMemo });
+  await expect(trashedCard).toBeVisible();
+  await trashedCard.getByRole("button", { name: "恢复", exact: true }).click();
+  await expect(trashedCard).toHaveCount(0);
+  await page.getByRole("link", { name: "我的记录" }).click();
+  await expect(page.getByText(shortcutMemo, { exact: true })).toBeVisible();
+
   const targetCard = page.locator("article.memo-card").filter({ hasText: content });
   await targetCard.getByRole("button", { name: "置顶", exact: true }).click();
   await expect(page.locator("article.memo-card").first()).toContainText(content);
@@ -109,6 +134,11 @@ test("initializes, captures a memo, filters by tag, and opens its public page", 
   await expect(targetCard.locator("textarea")).toHaveValue(resolvedContent);
   await targetCard.getByRole("button", { name: "保存", exact: true }).click();
   await expect(targetCard).toContainText(resolvedContent);
+
+  await targetCard.getByRole("button", { name: "历史", exact: true }).click();
+  const historyDialog = page.locator(".history-dialog");
+  await expect(historyDialog.getByText(remoteContent, { exact: true })).toBeVisible();
+  await historyDialog.locator(".dialog-close").click();
 
   const markdownDownloadPromise = page.waitForEvent("download");
   await targetCard.getByRole("button", { name: "导出 Markdown" }).click();

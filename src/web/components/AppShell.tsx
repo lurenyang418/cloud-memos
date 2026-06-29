@@ -1,4 +1,4 @@
-import { Archive, LogOut, NotebookPen, PanelLeftClose, PanelLeftOpen, Settings, Shield, UserRound, UsersRound } from "lucide-react";
+import { Archive, LogOut, NotebookPen, PanelLeftClose, PanelLeftOpen, Settings, Shield, Trash2, UserRound, UsersRound } from "lucide-react";
 import { useState, type PropsWithChildren } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { signOutSession } from "../api";
@@ -42,6 +42,7 @@ export function AppShell({ children }: PropsWithChildren) {
             <NavLink to="/" end className={navClass} title="我的记录"><NotebookPen size={18} /><span className="nav-link-label">我的记录</span></NavLink>
             <NavLink to="/feed" className={navClass} title="成员动态"><UsersRound size={18} /><span className="nav-link-label">成员动态</span></NavLink>
             <NavLink to="/archive" className={navClass} title="归档"><Archive size={18} /><span className="nav-link-label">归档</span></NavLink>
+            <NavLink to="/trash" className={navClass} title="回收站"><Trash2 size={18} /><span className="nav-link-label">回收站</span></NavLink>
             <NavLink to={`/u/${viewer.username}`} className={navClass} title="公开主页"><UserRound size={18} /><span className="nav-link-label">公开主页</span></NavLink>
             <NavLink to="/settings" className={navClass} title="设置"><Settings size={18} /><span className="nav-link-label">设置</span></NavLink>
             {viewer.role === "ADMIN" && <NavLink to="/admin" className={navClass} title="管理"><Shield size={18} /><span className="nav-link-label">管理</span></NavLink>}

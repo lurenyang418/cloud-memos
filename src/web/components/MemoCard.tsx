@@ -8,6 +8,7 @@ import { ApiError, api, formatBytes, getMemo } from "../api";
 import { FormError, Textarea } from "./Form";
 import { downloadMemoMarkdown } from "../export";
 import { Markdown } from "./Markdown";
+import { MemoHistoryDialog } from "./MemoHistoryDialog";
 import { VisibilityBadge, VisibilitySelect } from "./VisibilitySelect";
 
 const memoDateFormatter = new Intl.DateTimeFormat("zh-CN", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
@@ -33,6 +34,7 @@ export function MemoCard({ memo, editable = false, onTag }: { memo: Memo; editab
       queryClient.invalidateQueries({ queryKey: ["feed"] }),
       queryClient.invalidateQueries({ queryKey: ["memo", memo.id] }),
       queryClient.invalidateQueries({ queryKey: ["public-memos"] }),
+      queryClient.invalidateQueries({ queryKey: ["trash"] }),
     ]);
   };
   const update = useMutation({
@@ -101,11 +103,12 @@ export function MemoCard({ memo, editable = false, onTag }: { memo: Memo; editab
         <button className="action-button" type="button" onClick={() => downloadMemoMarkdown({ ...memo, content })}><FileDown size={15} />导出 Markdown</button>
         {editable && <>
           <button className="action-button" type="button" onClick={startEditing}><Pencil size={15} />编辑</button>
+          <MemoHistoryDialog memo={memo} />
           <button className="action-button" type="button" disabled={update.isPending} onClick={() => update.mutate({ pinned: !memo.pinned })}>{memo.pinned ? <PinOff size={15} /> : <Pin size={15} />}{memo.pinned ? "取消置顶" : "置顶"}</button>
           <button className="action-button" type="button" disabled={update.isPending} onClick={() => update.mutate({ state: memo.state === "ARCHIVED" ? "ACTIVE" : "ARCHIVED" })}>{memo.state === "ARCHIVED" ? <ArchiveRestore size={15} /> : <Archive size={15} />}{memo.state === "ARCHIVED" ? "恢复" : "归档"}</button>
           <Dialog.Root>
             <Dialog.Trigger asChild><button className="action-button danger" type="button"><Trash2 size={15} />删除</button></Dialog.Trigger>
-            <Dialog.Portal><Dialog.Overlay className="dialog-overlay" /><Dialog.Content className="dialog-content"><Dialog.Close className="dialog-close"><X size={18} /></Dialog.Close><Dialog.Title>永久删除这条 Memo？</Dialog.Title><Dialog.Description>内容及其附件将被删除，此操作无法撤销。</Dialog.Description><FormError error={remove.error?.message} /><div className="dialog-actions"><Dialog.Close className="button button-ghost">取消</Dialog.Close><button className="button button-danger" disabled={remove.isPending} onClick={() => remove.mutate()}>确认删除</button></div></Dialog.Content></Dialog.Portal>
+            <Dialog.Portal><Dialog.Overlay className="dialog-overlay" /><Dialog.Content className="dialog-content"><Dialog.Close className="dialog-close"><X size={18} /></Dialog.Close><Dialog.Title>移到回收站？</Dialog.Title><Dialog.Description>内容将在回收站保留 30 天，期间可以恢复。</Dialog.Description><FormError error={remove.error?.message} /><div className="dialog-actions"><Dialog.Close className="button button-ghost">取消</Dialog.Close><button className="button button-danger" disabled={remove.isPending} onClick={() => remove.mutate()}>移到回收站</button></div></Dialog.Content></Dialog.Portal>
           </Dialog.Root>
         </>}
       </footer>

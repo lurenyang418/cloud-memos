@@ -14,6 +14,7 @@ import { PublicProfilePage } from "./pages/PublicProfilePage";
 import { PublicFeedPage } from "./pages/PublicFeedPage";
 import { RecoveryPage } from "./pages/RecoveryPage";
 import { SettingsPage } from "./pages/SettingsPage";
+import { TrashPage } from "./pages/TrashPage";
 import { SetupPage } from "./pages/SetupPage";
 import { SessionContext } from "./session";
 
@@ -34,6 +35,7 @@ function ProtectedRoutes({ session }: { session: SessionResponse }) {
           <Route index element={<HomePage />} />
           <Route path="feed" element={<FeedPage />} />
           <Route path="archive" element={<HomePage archived />} />
+          <Route path="trash" element={<TrashPage />} />
           <Route path="settings" element={<SettingsPage />} />
           <Route path="admin" element={session.viewer.role === "ADMIN" ? <AdminPage /> : <Navigate to="/" replace />} />
           <Route path="*" element={<Navigate to="/" replace />} />

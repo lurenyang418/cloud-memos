@@ -7,7 +7,7 @@ Browser
   └─ Cloudflare Worker
        ├─ Workers Static Assets: React SPA
        ├─ Hono API + Better Auth
-       ├─ D1: users, sessions, API token hashes, memos, import keys, FTS5, settings
+       ├─ D1: users, sessions, API token hashes, memos, memo versions, import keys, FTS5, settings
        └─ R2: private attachment objects
 ```
 
@@ -24,9 +24,11 @@ Browser
 
 - D1 是业务元数据真源，时间使用 UTC 毫秒整数。
 - Memo 使用递增 `version` 做乐观并发控制。
+- 每次更新前保存当前 Memo 快照，按 Memo 保留最近可查询的 20 个版本；历史记录随 Memo 永久删除。
+- 普通删除只设置 `deleted_at`，所有常规读取都排除回收站内容；Cron 在 30 天后永久清理记录和附件。
 - FTS5 trigger 同步内容索引；中文查询额外使用受权限约束的 `instr()` 回退。
 - R2 只保存二进制，D1 保存 object key 和状态。上传采用 PENDING → READY 状态机。
-- Cron 清理过期 token、限流记录和未完成/失败删除的附件。
+- Cron 清理超过保留期的回收站内容、过期 token、限流记录和未完成/失败删除的附件。
 - API token 只保存 SHA-256 哈希；`last_used_at` 最多每小时异步写入一次。
 - ZIP 使用 `${exportId}:${sourceMemoId}` 作为用户级幂等键。Memo、tag、附件关联和幂等记录通过 D1 batch 原子写入。
 

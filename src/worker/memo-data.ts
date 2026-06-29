@@ -11,6 +11,7 @@ export interface MemoRow {
   version: number;
   createdAt: number;
   updatedAt: number;
+  deletedAt: number | null;
   authorId: string;
   authorName: string;
   authorUsername: string;
@@ -88,6 +89,7 @@ export async function hydrateMemos(env: AppBindings, rows: MemoRow[]): Promise<M
     version: row.version,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
+    deletedAt: row.deletedAt,
     author: { id: row.authorId, name: row.authorName, username: row.authorUsername, image: row.authorImage },
     tags: tags.get(row.id) ?? [],
     attachments: attachments.get(row.id) ?? [],
@@ -96,7 +98,7 @@ export async function hydrateMemos(env: AppBindings, rows: MemoRow[]): Promise<M
 
 const memoSelect = `
   SELECT m.id, m.content, m.visibility, m.state, m.pinned, m.version,
-         m.created_at AS createdAt, m.updated_at AS updatedAt,
+         m.created_at AS createdAt, m.updated_at AS updatedAt, m.deleted_at AS deletedAt,
          u.id AS authorId, u.name AS authorName, u.username AS authorUsername, u.image AS authorImage
   FROM memos m
   JOIN users u ON u.id = m.creator_id`;
@@ -105,7 +107,7 @@ export async function getMemoById(env: AppBindings, id: string, viewerId: string
   const access = viewerId
     ? "(m.creator_id = ? OR (m.state = 'ACTIVE' AND m.visibility IN ('MEMBERS', 'PUBLIC')))"
     : "(m.state = 'ACTIVE' AND m.visibility = 'PUBLIC')";
-  const statement = env.DB.prepare(`${memoSelect} WHERE m.id = ? AND ${access}`);
+  const statement = env.DB.prepare(`${memoSelect} WHERE m.id = ? AND m.deleted_at IS NULL AND ${access}`);
   const row = viewerId
     ? await statement.bind(id, viewerId).first<MemoRow>()
     : await statement.bind(id).first<MemoRow>();
@@ -113,8 +115,8 @@ export async function getMemoById(env: AppBindings, id: string, viewerId: string
   return (await hydrateMemos(env, [row]))[0];
 }
 
-export async function getOwnedMemo(env: AppBindings, id: string, creatorId: string): Promise<Memo> {
-  const row = await env.DB.prepare(`${memoSelect} WHERE m.id = ? AND m.creator_id = ?`).bind(id, creatorId).first<MemoRow>();
+export async function getOwnedMemo(env: AppBindings, id: string, creatorId: string, includeDeleted = false): Promise<Memo> {
+  const row = await env.DB.prepare(`${memoSelect} WHERE m.id = ? AND m.creator_id = ?${includeDeleted ? "" : " AND m.deleted_at IS NULL"}`).bind(id, creatorId).first<MemoRow>();
   if (!row) throw new HttpError(404, "MEMO_NOT_FOUND", "Memo 不存在");
   return (await hydrateMemos(env, [row]))[0];
 }

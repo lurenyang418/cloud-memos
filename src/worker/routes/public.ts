@@ -25,7 +25,7 @@ publicRoutes.get("/memos", validateQuery(listMemosSchema), async (c) => {
   if (input.cursor && !cursor) throw new HttpError(400, "INVALID_CURSOR", "分页游标无效");
   if (input.visibility && input.visibility !== "PUBLIC") throw new HttpError(400, "INVALID_VISIBILITY", "公开动态只支持公开内容");
 
-  const conditions = ["m.state = 'ACTIVE'", "m.visibility = 'PUBLIC'", "u.status = 'ACTIVE'"];
+  const conditions = ["m.state = 'ACTIVE'", "m.deleted_at IS NULL", "m.visibility = 'PUBLIC'", "u.status = 'ACTIVE'"];
   const values: Array<string | number> = [];
   if (input.tag) {
     conditions.push("EXISTS (SELECT 1 FROM memo_tags mt WHERE mt.memo_id = m.id AND mt.normalized = ?)");
@@ -62,7 +62,7 @@ publicRoutes.get("/users/:username/memos", validateQuery(listMemosSchema), async
     .bind(c.req.param("username")).first<{ id: string; name: string; username: string; image: string | null }>();
   if (!profile) throw new HttpError(404, "USER_NOT_FOUND", "用户不存在");
 
-  const conditions = ["m.creator_id = ?", "m.state = 'ACTIVE'", isMember ? "m.visibility IN ('MEMBERS', 'PUBLIC')" : "m.visibility = 'PUBLIC'"];
+  const conditions = ["m.creator_id = ?", "m.state = 'ACTIVE'", "m.deleted_at IS NULL", isMember ? "m.visibility IN ('MEMBERS', 'PUBLIC')" : "m.visibility = 'PUBLIC'"];
   const values: Array<string | number> = [profile.id];
   if (input.visibility && (input.visibility === "PUBLIC" || isMember)) {
     conditions.push("m.visibility = ?");

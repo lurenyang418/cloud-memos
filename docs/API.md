@@ -88,12 +88,44 @@ curl --fail-with-body \
 
 若版本过期，接口返回 `409 VERSION_CONFLICT` 和当前版本号。客户端应重新读取内容并由用户决定如何合并。
 
-删除：
+删除会把 Memo 移入回收站，并保留 30 天：
 
 ```bash
 curl --fail-with-body -X DELETE \
   -H "Authorization: Bearer $CLOUD_MEMOS_TOKEN" \
   "$CLOUD_MEMOS_URL/api/v1/memos/$MEMO_ID"
+```
+
+列出回收站内容、恢复或永久删除：
+
+```bash
+curl --fail-with-body \
+  -H "Authorization: Bearer $CLOUD_MEMOS_TOKEN" \
+  "$CLOUD_MEMOS_URL/api/v1/memos?deleted=true"
+
+curl --fail-with-body -X POST \
+  -H "Authorization: Bearer $CLOUD_MEMOS_TOKEN" \
+  -H 'Content-Type: application/json' \
+  --data '{}' \
+  "$CLOUD_MEMOS_URL/api/v1/memos/$MEMO_ID/restore"
+
+curl --fail-with-body -X DELETE \
+  -H "Authorization: Bearer $CLOUD_MEMOS_TOKEN" \
+  "$CLOUD_MEMOS_URL/api/v1/memos/$MEMO_ID/permanent"
+```
+
+每次修改前会保留旧版本，最多返回最近 20 个历史版本。恢复历史版本时，`version` 必须是当前 Memo 的版本号：
+
+```bash
+curl --fail-with-body \
+  -H "Authorization: Bearer $CLOUD_MEMOS_TOKEN" \
+  "$CLOUD_MEMOS_URL/api/v1/memos/$MEMO_ID/versions"
+
+curl --fail-with-body -X POST \
+  -H "Authorization: Bearer $CLOUD_MEMOS_TOKEN" \
+  -H 'Content-Type: application/json' \
+  --data '{"version":2}' \
+  "$CLOUD_MEMOS_URL/api/v1/memos/$MEMO_ID/versions/1/restore"
 ```
 
 ## 附件

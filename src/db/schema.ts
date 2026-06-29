@@ -135,11 +135,29 @@ export const memos = sqliteTable(
     version: integer("version").notNull().default(1),
     createdAt: integer("created_at").notNull(),
     updatedAt: integer("updated_at").notNull(),
+    deletedAt: integer("deleted_at"),
   },
   (table) => [
     index("memos_creator_timeline_idx").on(table.creatorId, table.state, table.pinned, table.createdAt),
+    index("memos_creator_deleted_idx").on(table.creatorId, table.deletedAt, table.createdAt),
     index("memos_visibility_idx").on(table.visibility, table.state, table.createdAt),
   ],
+);
+
+export const memoVersions = sqliteTable(
+  "memo_versions",
+  {
+    id: text("id").primaryKey(),
+    memoId: text("memo_id").notNull().references(() => memos.id, { onDelete: "cascade" }),
+    creatorId: text("creator_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    content: text("content").notNull(),
+    visibility: text("visibility", { enum: ["PRIVATE", "MEMBERS", "PUBLIC"] }).notNull(),
+    state: text("state", { enum: ["ACTIVE", "ARCHIVED"] }).notNull(),
+    pinned: integer("pinned", { mode: "boolean" }).notNull(),
+    version: integer("version").notNull(),
+    createdAt: integer("created_at").notNull(),
+  },
+  (table) => [uniqueIndex("memo_versions_memo_version_unique").on(table.memoId, table.version), index("memo_versions_memo_created_idx").on(table.memoId, table.createdAt)],
 );
 
 export const memoTags = sqliteTable(
@@ -194,4 +212,4 @@ export const attachmentRelations = relations(attachments, ({ one }) => ({
   creator: one(users, { fields: [attachments.creatorId], references: [users.id] }),
 }));
 
-export const schema = { users, sessions, accounts, verifications, rateLimits, instanceSettings, invitations, recoveryTokens, apiTokens, memos, memoTags, attachments, memoImports };
+export const schema = { users, sessions, accounts, verifications, rateLimits, instanceSettings, invitations, recoveryTokens, apiTokens, memos, memoVersions, memoTags, attachments, memoImports };

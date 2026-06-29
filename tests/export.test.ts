@@ -12,6 +12,7 @@ const memo: Memo = {
   version: 1,
   createdAt: Date.UTC(2026, 5, 28, 1, 2, 3),
   updatedAt: Date.UTC(2026, 5, 28, 1, 2, 3),
+  deletedAt: null,
   author: { id: "user", name: "User", username: "user", image: null },
   tags: [],
   attachments: [],

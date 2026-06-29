@@ -17,13 +17,14 @@ interface AttachmentAccessRow {
   memoCreatorId: string | null;
   memoVisibility: "PRIVATE" | "MEMBERS" | "PUBLIC" | null;
   memoState: "ACTIVE" | "ARCHIVED" | null;
+  memoDeletedAt: number | null;
 }
 
 async function attachmentRow(c: Parameters<typeof optionalViewer>[0], id: string): Promise<AttachmentAccessRow | null> {
   return c.env.DB.prepare(`
     SELECT a.id, a.creator_id AS creatorId, a.memo_id AS memoId, a.object_key AS objectKey,
            a.filename, a.content_type AS contentType, a.size, a.status,
-           m.creator_id AS memoCreatorId, m.visibility AS memoVisibility, m.state AS memoState
+           m.creator_id AS memoCreatorId, m.visibility AS memoVisibility, m.state AS memoState, m.deleted_at AS memoDeletedAt
     FROM attachments a LEFT JOIN memos m ON m.id = a.memo_id WHERE a.id = ?
   `).bind(id).first<AttachmentAccessRow>();
 }
@@ -31,6 +32,7 @@ async function attachmentRow(c: Parameters<typeof optionalViewer>[0], id: string
 function canReadAttachment(row: AttachmentAccessRow, viewerId: string | null): boolean {
   if (row.status !== "READY") return false;
   if (!row.memoId) return row.creatorId === viewerId;
+  if (row.memoDeletedAt !== null) return false;
   if (row.memoCreatorId === viewerId) return true;
   if (row.memoState !== "ACTIVE") return false;
   if (row.memoVisibility === "PUBLIC") return true;

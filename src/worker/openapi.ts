@@ -13,8 +13,8 @@ export const openApiDocument = {
   openapi: "3.1.0",
   info: {
     title: "Cloud Memos API",
-    version: "0.1.0",
-    description: "Personal Memo, attachment, export and import API. API token management requires a browser session.",
+    version: "0.3.0",
+    description: "Personal Memo, version history, recycle bin, attachment and import API. API token management requires a browser session.",
   },
   servers: [{ url: "/", description: "Current instance" }],
   tags: [
@@ -27,7 +27,10 @@ export const openApiDocument = {
     "/api/v1/memos": {
       get: {
         tags: ["Memos"], summary: "List the current user's memos", security: bearerOrCookie,
-        parameters: ["cursor", "tag", "visibility", "state", "q", "limit"].map((name) => ({ name, in: "query", schema: name === "limit" ? { type: "integer", minimum: 1, maximum: 50 } : { type: "string" } })),
+        parameters: [
+          ...["cursor", "tag", "visibility", "state", "q", "limit"].map((name) => ({ name, in: "query", schema: name === "limit" ? { type: "integer", minimum: 1, maximum: 50 } : { type: "string" } })),
+          { name: "deleted", in: "query", description: "Set to true to list the recycle bin", schema: { type: "string", enum: ["true"] } },
+        ],
         responses: { "200": { description: "Memo page", content: { "application/json": { schema: { $ref: "#/components/schemas/MemoPage" } } } }, "401": errorResponse, "403": errorResponse },
       },
       post: {
@@ -43,7 +46,24 @@ export const openApiDocument = {
         requestBody: jsonBody({ type: "object", required: ["version"], properties: { content: { type: "string" }, visibility: { $ref: "#/components/schemas/Visibility" }, state: { $ref: "#/components/schemas/State" }, pinned: { type: "boolean" }, version: { type: "integer", minimum: 1 } } }),
         responses: { "200": { description: "Updated memo" }, "409": errorResponse },
       },
-      delete: { tags: ["Memos"], summary: "Delete an owned memo", security: bearerOrCookie, parameters: [{ $ref: "#/components/parameters/Id" }], responses: { "204": { description: "Deleted" }, "404": errorResponse } },
+      delete: { tags: ["Memos"], summary: "Move an owned memo to the recycle bin", security: bearerOrCookie, parameters: [{ $ref: "#/components/parameters/Id" }], responses: { "204": { description: "Moved to recycle bin" }, "404": errorResponse } },
+    },
+    "/api/v1/memos/{id}/restore": {
+      post: { tags: ["Memos"], summary: "Restore a memo from the recycle bin", security: bearerOrCookie, parameters: [{ $ref: "#/components/parameters/Id" }], responses: { "200": { description: "Restored memo", content: { "application/json": { schema: { $ref: "#/components/schemas/Memo" } } } }, "404": errorResponse } },
+    },
+    "/api/v1/memos/{id}/permanent": {
+      delete: { tags: ["Memos"], summary: "Permanently delete a memo in the recycle bin", security: bearerOrCookie, parameters: [{ $ref: "#/components/parameters/Id" }], responses: { "204": { description: "Permanently deleted" }, "404": errorResponse } },
+    },
+    "/api/v1/memos/{id}/versions": {
+      get: { tags: ["Memos"], summary: "List up to 20 recent versions of an owned memo", security: bearerOrCookie, parameters: [{ $ref: "#/components/parameters/Id" }], responses: { "200": { description: "Version list", content: { "application/json": { schema: { type: "object", required: ["items"], properties: { items: { type: "array", items: { $ref: "#/components/schemas/MemoVersion" } } } } } } }, "404": errorResponse } },
+    },
+    "/api/v1/memos/{id}/versions/{version}/restore": {
+      post: {
+        tags: ["Memos"], summary: "Restore an owned memo to a historical version", security: bearerOrCookie,
+        parameters: [{ $ref: "#/components/parameters/Id" }, { name: "version", in: "path", required: true, schema: { type: "integer", minimum: 1 } }],
+        requestBody: jsonBody({ type: "object", required: ["version"], properties: { version: { type: "integer", minimum: 1, description: "Current optimistic-lock version" } } }),
+        responses: { "200": { description: "Restored memo", content: { "application/json": { schema: { $ref: "#/components/schemas/Memo" } } } }, "404": errorResponse, "409": errorResponse },
+      },
     },
     "/api/v1/feed": {
       get: { tags: ["Memos"], summary: "List member-visible feed", security: bearerOrCookie, responses: { "200": { description: "Memo page" }, "401": errorResponse } },
@@ -106,7 +126,8 @@ export const openApiDocument = {
       State: { type: "string", enum: ["ACTIVE", "ARCHIVED"] },
       Attachment: { type: "object", required: ["id", "filename", "contentType", "size", "status", "url"], properties: { id: { type: "string", format: "uuid" }, filename: { type: "string" }, contentType: { type: "string" }, size: { type: "integer" }, status: { type: "string", enum: ["PENDING", "READY"] }, url: { type: "string" } } },
       Author: { type: "object", required: ["id", "name", "username"], properties: { id: { type: "string" }, name: { type: "string" }, username: { type: "string" }, image: { type: ["string", "null"] } } },
-      Memo: { type: "object", required: ["id", "content", "visibility", "state", "pinned", "version", "createdAt", "updatedAt", "author", "tags", "attachments"], properties: { id: { type: "string", format: "uuid" }, content: { type: "string" }, visibility: { $ref: "#/components/schemas/Visibility" }, state: { $ref: "#/components/schemas/State" }, pinned: { type: "boolean" }, version: { type: "integer" }, createdAt: { type: "integer" }, updatedAt: { type: "integer" }, author: { $ref: "#/components/schemas/Author" }, tags: { type: "array", items: { type: "string" } }, attachments: { type: "array", items: { $ref: "#/components/schemas/Attachment" } } } },
+      Memo: { type: "object", required: ["id", "content", "visibility", "state", "pinned", "version", "createdAt", "updatedAt", "deletedAt", "author", "tags", "attachments"], properties: { id: { type: "string", format: "uuid" }, content: { type: "string" }, visibility: { $ref: "#/components/schemas/Visibility" }, state: { $ref: "#/components/schemas/State" }, pinned: { type: "boolean" }, version: { type: "integer" }, createdAt: { type: "integer" }, updatedAt: { type: "integer" }, deletedAt: { type: ["integer", "null"] }, author: { $ref: "#/components/schemas/Author" }, tags: { type: "array", items: { type: "string" } }, attachments: { type: "array", items: { $ref: "#/components/schemas/Attachment" } } } },
+      MemoVersion: { type: "object", required: ["id", "memoId", "content", "visibility", "state", "pinned", "version", "createdAt"], properties: { id: { type: "string", format: "uuid" }, memoId: { type: "string", format: "uuid" }, content: { type: "string" }, visibility: { $ref: "#/components/schemas/Visibility" }, state: { $ref: "#/components/schemas/State" }, pinned: { type: "boolean" }, version: { type: "integer" }, createdAt: { type: "integer" } } },
       MemoPage: { type: "object", required: ["items", "nextCursor"], properties: { items: { type: "array", items: { $ref: "#/components/schemas/Memo" } }, nextCursor: { type: ["string", "null"] } } },
       Error: { type: "object", required: ["error"], properties: { error: { type: "object", required: ["code", "message"], properties: { code: { type: "string" }, message: { type: "string" }, details: {} } } } },
       ImportMemo: {

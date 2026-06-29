@@ -51,7 +51,10 @@ export const listMemosSchema = z.object({
   visibility: z.enum(memoVisibilities).optional(),
   state: z.enum(memoStates).default("ACTIVE"),
   q: z.string().trim().min(1).max(100).optional(),
+  deleted: z.enum(["true"]).optional(),
 });
+
+export const restoreMemoVersionSchema = z.object({ version: z.number().int().positive() });
 
 export const createInvitationSchema = z.object({
   email: z.string().email().max(254),

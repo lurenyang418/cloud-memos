@@ -62,6 +62,21 @@ app.onError((error, c) => {
 
 async function cleanup(env: AppBindings): Promise<void> {
   const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+  const trashCutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
+  const expiredMemos = await env.DB.prepare("SELECT id FROM memos WHERE deleted_at IS NOT NULL AND deleted_at < ? LIMIT 500")
+    .bind(trashCutoff).all<{ id: string }>();
+  if (expiredMemos.results.length > 0) {
+    const placeholders = expiredMemos.results.map(() => "?").join(",");
+    const ids = expiredMemos.results.map((row) => row.id);
+    await env.DB.batch([
+      env.DB.prepare(`
+        UPDATE attachments SET status = 'DELETING', updated_at = ?
+        WHERE memo_id IN (${placeholders})
+          AND EXISTS (SELECT 1 FROM memos WHERE id = attachments.memo_id AND deleted_at < ?)
+      `).bind(Date.now(), ...ids, trashCutoff),
+      env.DB.prepare(`DELETE FROM memos WHERE id IN (${placeholders}) AND deleted_at < ?`).bind(...ids, trashCutoff),
+    ]);
+  }
   const stale = await env.DB.prepare(
     "SELECT id, object_key AS objectKey FROM attachments WHERE status = 'DELETING' OR (memo_id IS NULL AND status IN ('PENDING', 'READY') AND created_at < ?) LIMIT 500",
   ).bind(cutoff).all<{ id: string; objectKey: string }>();

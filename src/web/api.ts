@@ -41,6 +41,7 @@ export interface MemoFilters {
   q?: string;
   tag?: string;
   cursor?: string;
+  deleted?: boolean;
 }
 
 export function listMemos(filters: MemoFilters = {}) {
@@ -51,6 +52,7 @@ export function listMemos(filters: MemoFilters = {}) {
   if (filters.q) params.set("q", filters.q);
   if (filters.tag) params.set("tag", filters.tag);
   if (filters.cursor) params.set("cursor", filters.cursor);
+  if (filters.deleted) params.set("deleted", "true");
   return api<CursorPage<Memo>>(`/api/v1/memos?${params}`);
 }
 

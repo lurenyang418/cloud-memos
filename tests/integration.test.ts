@@ -207,6 +207,67 @@ describe.sequential("worker integration", () => {
     expect(publicFeedContents).not.toContain("private note #秘密");
   });
 
+  it("keeps version history and supports recycle-bin restore and permanent deletion", async () => {
+    const createdResponse = await request("/api/v1/memos", {
+      method: "POST",
+      body: JSON.stringify({ content: "history version one #old", visibility: "PUBLIC", attachmentIds: [] }),
+    }, adminCookie);
+    expect(createdResponse.status).toBe(201);
+    const created = await json<{ id: string; version: number }>(createdResponse);
+
+    expect((await request(`/api/v1/memos/${created.id}/permanent`, { method: "DELETE" }, adminCookie)).status).toBe(404);
+    expect((await request(`/api/v1/memos/${created.id}`, undefined, adminCookie)).status).toBe(200);
+
+    const updatedResponse = await request(`/api/v1/memos/${created.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ content: "history version two #new", visibility: "MEMBERS", state: "ARCHIVED", pinned: true, version: created.version }),
+    }, adminCookie);
+    expect(updatedResponse.status).toBe(200);
+    const updated = await json<{ version: number }>(updatedResponse);
+
+    const firstHistory = await json<{ items: Array<{ version: number; content: string; visibility: string; state: string }> }>(
+      await request(`/api/v1/memos/${created.id}/versions`, undefined, adminCookie),
+    );
+    expect(firstHistory.items).toContainEqual(expect.objectContaining({ version: 1, content: "history version one #old", visibility: "PUBLIC", state: "ACTIVE" }));
+
+    const restoredVersionResponse = await request(`/api/v1/memos/${created.id}/versions/1/restore`, {
+      method: "POST",
+      body: JSON.stringify({ version: updated.version }),
+    }, adminCookie);
+    expect(restoredVersionResponse.status).toBe(200);
+    const restoredVersion = await json<{ content: string; visibility: string; state: string; pinned: boolean; version: number }>(restoredVersionResponse);
+    expect(restoredVersion).toMatchObject({ content: "history version one #old", visibility: "PUBLIC", state: "ACTIVE", pinned: false, version: 3 });
+    const oldTagSearch = await json<{ items: Array<{ id: string }> }>(await request("/api/v1/memos?tag=old", undefined, adminCookie));
+    const newTagSearch = await json<{ items: Array<{ id: string }> }>(await request("/api/v1/memos?tag=new", undefined, adminCookie));
+    expect(oldTagSearch.items.map((item) => item.id)).toContain(created.id);
+    expect(newTagSearch.items.map((item) => item.id)).not.toContain(created.id);
+    expect((await request(`/api/v1/memos/${created.id}/versions/1/restore`, {
+      method: "POST", body: JSON.stringify({ version: updated.version }),
+    }, adminCookie)).status).toBe(409);
+    const secondHistory = await json<{ items: Array<{ version: number; content: string }> }>(
+      await request(`/api/v1/memos/${created.id}/versions`, undefined, adminCookie),
+    );
+    expect(secondHistory.items).toContainEqual(expect.objectContaining({ version: 2, content: "history version two #new" }));
+
+    expect((await request(`/api/v1/memos/${created.id}`, { method: "DELETE" }, adminCookie)).status).toBe(204);
+    expect((await request(`/api/v1/memos/${created.id}`, undefined, adminCookie)).status).toBe(404);
+    const normalList = await json<{ items: Array<{ id: string }> }>(await request("/api/v1/memos", undefined, adminCookie));
+    expect(normalList.items.map((item) => item.id)).not.toContain(created.id);
+    const trash = await json<{ items: Array<{ id: string; deletedAt: number | null }> }>(await request("/api/v1/memos?deleted=true", undefined, adminCookie));
+    expect(trash.items).toContainEqual(expect.objectContaining({ id: created.id, deletedAt: expect.any(Number) }));
+    const publicList = await json<{ items: Array<{ id: string }> }>(await request("/api/v1/public/memos"));
+    expect(publicList.items.map((item) => item.id)).not.toContain(created.id);
+
+    const restoredTrashResponse = await request(`/api/v1/memos/${created.id}/restore`, { method: "POST", body: "{}" }, adminCookie);
+    expect(restoredTrashResponse.status).toBe(200);
+    expect(await json<{ content: string; state: string }>(restoredTrashResponse)).toMatchObject({ content: "history version one #old", state: "ACTIVE" });
+    expect((await request(`/api/v1/memos/${created.id}`, { method: "DELETE" }, adminCookie)).status).toBe(204);
+    await env.DB.prepare("UPDATE memos SET deleted_at = ? WHERE id = ?").bind(Date.now() - 31 * 24 * 60 * 60 * 1000, created.id).run();
+    expect((await request(`/api/v1/memos/${created.id}/restore`, { method: "POST", body: "{}" }, adminCookie)).status).toBe(404);
+    expect((await request(`/api/v1/memos/${created.id}/permanent`, { method: "DELETE" }, adminCookie)).status).toBe(204);
+    expect((await request(`/api/v1/memos/${created.id}/restore`, { method: "POST", body: "{}" }, adminCookie)).status).toBe(404);
+  });
+
   it("blocks cross-user mutation and cross-origin writes", async () => {
     const idor = await request(`/api/v1/memos/${privateMemoId}`, {
       method: "PATCH",
@@ -291,7 +352,10 @@ describe.sequential("worker integration", () => {
     const attachmentMemo = await json<{ id: string }>(attachmentMemoResponse);
     const download = await request(`/api/v1/attachments/${pending.id}/content`, { headers: { authorization: `Bearer ${writeToken}` } });
     expect(await download.text()).toBe(attachmentContent);
+    expect((await request(`/api/v1/memos/${attachmentMemo.id}/permanent`, { method: "DELETE", headers: { authorization: `Bearer ${writeToken}` } })).status).toBe(404);
+    expect((await request(`/api/v1/attachments/${pending.id}/content`, { headers: { authorization: `Bearer ${writeToken}` } })).status).toBe(200);
     expect((await request(`/api/v1/memos/${attachmentMemo.id}`, { method: "DELETE", headers: { authorization: `Bearer ${writeToken}` } })).status).toBe(204);
+    expect((await request(`/api/v1/attachments/${pending.id}/content`, { headers: { authorization: `Bearer ${writeToken}` } })).status).toBe(404);
     expect((await request(`/api/v1/memos/${apiMemo.id}`, { method: "DELETE", headers: { authorization: `Bearer ${writeToken}` } })).status).toBe(204);
 
     expect((await request("/api/auth/change-password", { method: "POST", headers: { authorization: `Bearer ${writeToken}` }, body: JSON.stringify({ currentPassword: "admin1234", newPassword: "changed88" }) })).status).not.toBe(200);
@@ -364,6 +428,8 @@ describe.sequential("worker integration", () => {
     expect(document.openapi).toBe("3.1.0");
     expect(document.paths).toHaveProperty("/api/v1/api-tokens");
     expect(document.paths).toHaveProperty("/api/v1/import/memos");
+    expect(document.paths).toHaveProperty("/api/v1/memos/{id}/versions");
+    expect(document.paths).toHaveProperty("/api/v1/memos/{id}/restore");
   });
 
   it("paginates without duplicates", async () => {
