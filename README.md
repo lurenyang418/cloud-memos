@@ -188,6 +188,7 @@ pnpm exec wrangler d1 time-travel info cloud-memos --env="" --json
 
 ## 项目文档
 
+- [在线文档](https://lurenyang418.github.io/cloud-memos/)
 - [Agent 协作指南](./AGENTS.md)
 - [架构说明](./docs/ARCHITECTURE.md)
 - [API 与 curl 示例](./docs/API.md)
