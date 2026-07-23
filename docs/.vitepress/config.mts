@@ -12,6 +12,9 @@ export default defineConfig({
   base,
   cleanUrls: true,
   lastUpdated: true,
+  markdown: {
+    theme: "github-dark-high-contrast",
+  },
   sitemap: {
     hostname: siteUrl,
   },
