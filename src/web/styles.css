@@ -61,7 +61,7 @@ button:disabled { cursor: not-allowed; opacity: .58; }
 .composer-dragging { border-color: var(--accent); box-shadow: 0 0 0 4px rgb(214 99 56 / 12%), var(--shadow); }
 .textarea { width: 100%; border: 1px solid #dcd5ca; border-radius: 10px; background: var(--paper); color: var(--ink); padding: 12px 13px; line-height: 1.6; min-height: 130px; resize: vertical; outline: none; }
 .textarea:focus, .input:focus, .search-box:focus-within { border-color: #d18b6f; box-shadow: 0 0 0 3px rgb(214 99 56 / 11%); }
-.composer-input { display: block; border: 0; border-radius: 0; min-height: 148px; padding: 20px 21px; background: transparent; font-size: 15px; }
+.textarea.composer-input { display: block; border: 0; border-radius: 0; min-height: 220px; padding: 20px 21px; background: transparent; font-size: 15px; }
 .composer-input:focus { box-shadow: none; }
 .composer-toolbar { border-top: 1px solid #eee9e0; padding: 11px 13px; display: flex; align-items: center; justify-content: space-between; gap: 12px; background: #fdfbf6; }
 .composer-submit { display: flex; align-items: center; gap: 9px; }
@@ -114,6 +114,7 @@ button:disabled { cursor: not-allowed; opacity: .58; }
 .tag-list button { border: 0; border-radius: 6px; background: #f1ede5; color: #6c625a; padding: 4px 7px; font-size: 11px; }
 .tag-list button:hover { color: var(--accent-dark); background: var(--accent-soft); }
 .edit-form { display: grid; gap: 12px; }
+.textarea.edit-textarea { min-height: 360px; }
 
 .markdown-body { color: #38322e; font-size: 14px; line-height: 1.75; overflow-wrap: anywhere; }
 .markdown-body > :first-child { margin-top: 0; }
@@ -278,6 +279,8 @@ td strong, td small { display: block; } td small { color: #91877f; margin-top: 2
   .nav-link svg { width: 18px; }
   .main-content { padding: 32px 15px 70px; }
   .admin-grid { grid-template-columns: 1fr; }
+  .textarea.composer-input { min-height: 200px; }
+  .textarea.edit-textarea { min-height: 320px; }
 }
 
 @media (max-width: 560px) {
@@ -286,7 +289,9 @@ td strong, td small { display: block; } td small { color: #91877f; margin-top: 2
   .composer-toolbar { align-items: stretch; }
   .composer-toolbar > div { flex-wrap: wrap; }
   .composer-shortcut { display: none; }
+  .textarea.composer-input { min-height: 160px; }
   .memo-card { padding: 15px 14px 9px; }
+  .textarea.edit-textarea { min-height: 280px; }
   .memo-header { align-items: flex-start; }
   .memo-meta { max-width: 45%; }
   .attachments-grid { grid-template-columns: 1fr; }

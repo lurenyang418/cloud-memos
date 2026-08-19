@@ -86,7 +86,7 @@ export function MemoCard({ memo, editable = false, onTag }: { memo: Memo; editab
       </header>
       {editing ? (
         <form className="edit-form" onSubmit={submitEdit}>
-          <Textarea value={content} required maxLength={100_000} onChange={(event) => setContent(event.target.value)} />
+          <Textarea className="edit-textarea" aria-label="编辑 Memo" value={content} required maxLength={100_000} onChange={(event) => setContent(event.target.value)} />
           {conflictMessage && <div className="conflict-notice" role="status">{conflictMessage}</div>}
           <FormError error={update.error instanceof ApiError && update.error.code === "VERSION_CONFLICT" ? null : update.error?.message} />
           <div className="flex items-center justify-between"><VisibilitySelect value={visibility} onChange={setVisibility} /><div className="flex gap-2"><button className="button button-ghost" type="button" onClick={() => setEditing(false)}>取消</button><button className="button button-primary" disabled={update.isPending}>保存</button></div></div>
