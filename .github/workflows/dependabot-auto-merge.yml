@@ -1,0 +1,140 @@
+name: Dependabot auto-merge
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dependabot-auto-merge-pr-${{ github.event.workflow_run.pull_requests[0].number || github.event.workflow_run.id }}
+  cancel-in-progress: true
+
+jobs:
+  merge:
+    if: >-
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Inspect the completed pull request
+        id: pr
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPOSITORY: ${{ github.repository }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          RUN_SHA: ${{ github.event.workflow_run.head_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          pr_number="$(gh api "repos/${REPOSITORY}/actions/runs/${RUN_ID}/pull_requests" --jq '.[0].number // empty')"
+          if [[ -z "${pr_number}" ]]; then
+            echo "No pull request is associated with this CI run."
+            exit 0
+          fi
+
+          pr_json="$(gh api "repos/${REPOSITORY}/pulls/${pr_number}")"
+          author="$(jq -r '.user.login' <<<"${pr_json}")"
+          base="$(jq -r '.base.ref' <<<"${pr_json}")"
+          head_sha="$(jq -r '.head.sha' <<<"${pr_json}")"
+          state="$(jq -r '.state' <<<"${pr_json}")"
+          draft="$(jq -r '.draft' <<<"${pr_json}")"
+
+          if [[ "${author}" != "dependabot[bot]" ]]; then
+            echo "Skipping non-Dependabot PR #${pr_number}."
+            exit 0
+          fi
+          if [[ "${base}" != "main" ]]; then
+            echo "Skipping Dependabot PR #${pr_number} targeting ${base}."
+            exit 0
+          fi
+          if [[ "${state}" != "open" || "${draft}" == "true" ]]; then
+            echo "Skipping PR #${pr_number}: state=${state}, draft=${draft}."
+            exit 0
+          fi
+          if [[ "${head_sha}" != "${RUN_SHA}" ]]; then
+            echo "Skipping PR #${pr_number}: its head changed after CI started."
+            exit 0
+          fi
+
+          # A Dependabot PR can be modified after it is opened. Require every PR
+          # commit to be associated with Dependabot and have a valid signature.
+          commit_json="$(gh api --paginate --slurp "repos/${REPOSITORY}/pulls/${pr_number}/commits")"
+          if [[ "$(jq '[.[][]] | length' <<<"${commit_json}")" == "0" ]]; then
+            echo "Skipping PR #${pr_number}: no commits were returned."
+            exit 0
+          fi
+          invalid_commit="$(jq -r '
+            .[][]
+            | select((.author.login // "") != "dependabot[bot]"
+              or (.commit.verification.verified != true)
+              or (.commit.verification.reason // "") != "valid")
+            | .sha
+          ' <<<"${commit_json}")"
+          if [[ -n "${invalid_commit}" ]]; then
+            echo "Skipping PR #${pr_number}: unverified or non-Dependabot commit(s):"
+            echo "${invalid_commit}"
+            exit 0
+          fi
+
+          # Read update types only from Dependabot's signed commit metadata block,
+          # never from the editable pull request body. Grouped PRs may contain
+          # multiple entries, so use the highest version change.
+          update_types="$(jq -r '.[][] | .commit.message' <<<"${commit_json}" \
+            | awk '
+              /^updated-dependencies:/ { in_block = 1; next }
+              in_block && /^\.\.\.$/ { in_block = 0; next }
+              in_block { print }
+            ' \
+            | grep -oE 'version-update:semver-(major|minor|patch)' || true)"
+          highest_update_type=""
+          while read -r candidate; do
+            case "${candidate}" in
+              version-update:semver-major)
+                highest_update_type="${candidate}"
+                break
+                ;;
+              version-update:semver-minor)
+                if [[ -z "${highest_update_type}" || "${highest_update_type}" == "version-update:semver-patch" ]]; then
+                  highest_update_type="${candidate}"
+                fi
+                ;;
+              version-update:semver-patch)
+                if [[ -z "${highest_update_type}" ]]; then
+                  highest_update_type="${candidate}"
+                fi
+                ;;
+            esac
+          done <<<"${update_types}"
+
+          if [[ "${highest_update_type}" != "version-update:semver-patch" && "${highest_update_type}" != "version-update:semver-minor" ]]; then
+            echo "Skipping PR #${pr_number}: highest commit update type ${highest_update_type:-unknown} requires review."
+            exit 0
+          fi
+
+          echo "number=${pr_number}" >>"${GITHUB_OUTPUT}"
+
+      - name: Squash-merge the verified Dependabot pull request
+        if: steps.pr.outputs.number != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          merge_response="$(gh api --method PUT "repos/${REPOSITORY}/pulls/${PR_NUMBER}/merge" \
+            --field merge_method=squash \
+            --field sha="${HEAD_SHA}")"
+          if [[ "$(jq -r '.merged' <<<"${merge_response}")" != "true" ]]; then
+            echo "GitHub did not merge PR #${PR_NUMBER}:"
+            jq -r '.message // .' <<<"${merge_response}"
+            exit 1
+          fi
